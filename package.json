@@ -1,0 +1,15 @@
+{
+  "name": "exam-generator",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Практикум — учебный генератор заданий и конструктор промптов",
+  "type": "module",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "dev": "python -m http.server 8000 --directory dist",
+    "start": "python -m http.server 8000 --directory dist",
+    "test": "node tests/verify.mjs"
+  }
+}
