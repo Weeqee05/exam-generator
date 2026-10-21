@@ -8,21 +8,316 @@
   <title>Практикум — подготовка к экзамену</title>
   <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2314594c'/%3E%3Cpath d='M18 46V18h28v28M32 18v28' fill='none' stroke='%23d5f3ca' stroke-width='6'/%3E%3C/svg%3E">
   <style>
-:root{--ink:#243a34;--muted:#738079;--green:#14594c;--green-dark:#10473d;--mint:#eaf3e7;--lime:#d8edb3;--paper:#f7f8f3;--line:#e3e8df;--white:#fff;--radius:16px;font-family:Inter,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;color:var(--ink);background:var(--paper);font-synthesis:none}
-*{box-sizing:border-box}body{margin:0}button,input,select{font:inherit}button,a,input,select,summary{-webkit-tap-highlight-color:transparent}button{cursor:pointer}a{color:inherit}svg{width:20px;height:20px;fill:none;stroke:currentColor;stroke-width:1.65;stroke-linecap:round;stroke-linejoin:round;flex-shrink:0}.icon-defs{display:none}button{border:0}button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible,a:focus-visible,pre:focus-visible{outline:3px solid #6ea899;outline-offset:4px}[hidden]{display:none!important}.sr-only{position:absolute;width:1px;height:1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}.skip-link{position:fixed;top:-60px;left:16px;background:var(--green);color:white;z-index:20;padding:12px;border-radius:8px}.skip-link:focus{top:12px}.app-shell{display:flex;min-height:100vh}.sidebar{width:236px;flex-shrink:0;border-right:1px solid var(--line);background:#fdfefb;padding:36px 22px 24px;display:flex;flex-direction:column;position:fixed;inset:0 auto 0 0;z-index:3}.brand{display:flex;gap:10px;align-items:center;text-decoration:none;font-size:23px;font-weight:750;letter-spacing:-1px;padding:0 4px}.brand-dot{color:#78a483}.brand-mark{display:grid;place-items:center;color:#e4f0ca;background:var(--green);width:34px;height:34px;border-radius:10px;font-size:26px;line-height:1;font-weight:650;letter-spacing:0;padding-bottom:5px}.sidebar-label{font-size:8px;font-weight:700;letter-spacing:1.3px;color:#89958c;margin:49px 10px 16px;white-space:nowrap}.navigation{display:grid;gap:7px}.nav-item{background:transparent;color:#6a7970;display:flex;align-items:center;gap:12px;text-align:left;border-radius:9px;padding:14px 12px;font-size:13px;font-weight:550;min-height:46px}.nav-item:hover{background:#f0f3ec}.nav-item.active{background:var(--mint);color:var(--green)}.nav-item svg{width:18px;height:18px}.nav-active-dot{margin-left:auto;width:6px;height:6px;background:#398e71;border-radius:50%}.history-count{margin-left:auto;font-size:11px;color:#87948c}.sidebar-note{background:#f3f5ed;border-radius:13px;padding:18px;margin-top:51px;position:relative;overflow:hidden}.note-icon{font-size:26px;color:#629974}.sidebar-note h3{font-size:13px;margin:12px 0 8px}.sidebar-note p{font-size:12px;line-height:1.7;color:#738075;margin:0}.note-line{display:block;width:25px;height:1px;background:#cad6be;margin:18px 0 12px}.note-caption{font-size:10px;color:#809174}.sidebar-bottom{margin-top:auto;display:flex;gap:11px;align-items:center;padding:24px 8px 0}.avatar{width:34px;height:34px;border-radius:50%;background:#eee8d6;color:#7d8065;display:grid;place-items:center;font-size:12px}.sidebar-bottom strong{display:block;font-size:12px;font-weight:600}.sidebar-bottom div span{font-size:10px;color:#8b968e;display:block;margin-top:3px}main{margin-left:236px;width:calc(100% - 236px)}.topbar{height:80px;border-bottom:1px solid var(--line);padding:0 48px;display:flex;align-items:center;justify-content:space-between;gap:15px;background:#fafbf7}.breadcrumb{font-size:11px;color:#93a092;display:flex;align-items:center;gap:17px}.breadcrumb strong{font-weight:500;color:#5b6e61}.breadcrumb span{color:#b3beb2}.prototype-badge{display:flex;align-items:center;gap:7px;border:1px solid #e1e7da;background:#f2f5ed;padding:7px 10px;border-radius:20px;font-size:10px;color:#697e64;white-space:nowrap}.prototype-badge span{width:5px;height:5px;background:#92ad78;border-radius:50%}.content{max-width:1192px;padding:39px 48px 0;margin:0 auto}.hero{display:flex;justify-content:space-between;align-items:center;min-height:240px;margin-bottom:35px;gap:20px}.eyebrow{font-size:9px;font-weight:650;letter-spacing:1.7px;color:#6d8674;display:flex;gap:8px;align-items:center}.eyebrow>span{width:5px;height:5px;border-radius:50%;background:#79a076}.hero h1{font-size:clamp(38px,4vw,52px);letter-spacing:-2px;line-height:1.13;font-weight:650;margin:17px 0 17px}.hero h1 em{font-style:normal;color:#40876a}.hero p{font-size:13px;line-height:1.8;color:#778579;margin:0}.hero-art{width:340px;height:226px;position:relative;flex-shrink:0;margin-right:5px}.orbit{position:absolute;width:204px;height:204px;border:1px solid #e0e8d6;border-radius:50%;right:34px;top:1px}.orbit:before{content:"";position:absolute;inset:22px;border:1px dashed #e0e8d6;border-radius:50%}.paper{position:absolute;width:247px;height:178px;top:21px;left:33px;background:#fefff9;transform:rotate(-7deg);border:1px solid #e4e9d9;border-radius:10px;padding:20px 21px;box-shadow:0 14px 30px #324a3010}.paper-caption{color:#83916f;letter-spacing:1.6px;font-size:8px;font-weight:700}.paper-row{display:flex;gap:10px;align-items:center;font-size:10px;color:#677758;margin-top:14px}.paper-check{font-size:10px;width:14px;height:14px;display:grid;place-items:center;border-radius:4px;background:#dbecc8;color:#548357}.paper-box{width:14px;height:14px;border-radius:4px;border:1px solid #c8d6b6}.paper-formula{font-family:Georgia,serif;color:#7e8c71;font-size:11px;padding-top:13px;margin-top:13px;border-top:1px solid #e7ecd9}.paper-formula>span{margin:0 12px}.art-sticker{position:absolute;background:var(--lime);color:#3e6d46;font-size:10px;font-weight:550;border-radius:7px;right:4px;bottom:30px;padding:13px 16px;transform:rotate(7deg);box-shadow:0 4px 12px #54694c10}.art-sticker span{margin-left:8px}.art-star{position:absolute;left:7px;top:8px;color:#91ac75;font-size:38px;transform:rotate(12deg)}.art-dot{position:absolute;border-radius:50%;background:#d6e2c1}.dot-one{height:9px;width:9px;right:12px;top:23px}.dot-two{height:6px;width:6px;left:3px;bottom:30px}.config-card{background:white;border:1px solid var(--line);border-radius:var(--radius);padding:23px 25px 0;box-shadow:0 3px 8px #26401f03}.section-caption{display:flex;align-items:center;justify-content:space-between;margin-bottom:23px}.section-caption h2{font-size:15px;letter-spacing:-.2px;font-weight:600;margin:0}.section-caption>span{font-size:9px;color:#9aa495;letter-spacing:.5px}.settings-grid{display:grid;grid-template-columns:minmax(200px,1.25fr) minmax(220px,1.2fr) minmax(130px,.7fr);gap:22px}.field{min-width:0;padding:0;margin:0;border:0}.field>label,.field legend{font-size:11px;font-weight:600;display:block;margin-bottom:9px;padding:0}.select-wrap{position:relative}.select-wrap>svg{position:absolute;left:12px;top:14px;pointer-events:none;color:#7c8b7a;width:16px;height:16px}.select-wrap select{width:100%;height:43px;border:1px solid var(--line);border-radius:8px;background:#fbfcf8;padding:0 28px 0 37px;font-size:11px;color:#495d4d;cursor:pointer}.field-description{font-size:9px;color:#98a191;display:block;margin-top:9px;line-height:1.5}.level-options{display:flex;background:#f4f6ef;padding:4px;border-radius:8px;height:43px;border:1px solid #e8ece3}.level-options label{flex:1;min-width:0;position:relative;cursor:pointer}.level-options input{position:absolute;opacity:0;width:100%;height:100%;margin:0}.level-options span{display:flex;align-items:center;justify-content:center;font-size:10px;height:33px;border-radius:6px;color:#85907e;position:relative;pointer-events:none;white-space:nowrap}.level-options input:checked+span{background:white;color:var(--green);font-weight:650;box-shadow:0 1px 5px #283d1710}.level-options input:focus-visible+span{outline:3px solid #6ea899;outline-offset:1px}.stepper{display:flex;justify-content:space-between;border:1px solid var(--line);border-radius:8px;height:43px;background:#fbfcf8;overflow:hidden}.stepper button{width:39px;background:transparent;color:#7c8e76;font-size:21px;flex-shrink:0}.stepper button:hover{background:#ebf1e4}.stepper button:disabled{cursor:default;color:#c9d1c5}.stepper input{width:100%;min-width:20px;text-align:center;border:0;background:transparent;color:var(--ink);font-size:12px;font-weight:600;-moz-appearance:textfield}.stepper input::-webkit-inner-spin-button{appearance:none}.config-bottom{margin-top:23px;border-top:1px solid #edf0e8;padding:17px 0;display:flex;align-items:center;justify-content:space-between;gap:10px}.config-bottom p{display:flex;gap:7px;align-items:center;font-size:10px;color:#8c9786;margin:0}.config-bottom p svg{width:14px;height:14px}.primary-button{height:44px;display:flex;align-items:center;justify-content:center;gap:10px;border-radius:8px;background:var(--green);color:white;font-size:11px;font-weight:600;padding:0 17px;box-shadow:0 3px 5px #154c3010;transition:background .18s,transform .18s}.primary-button:hover{background:var(--green-dark);transform:translateY(-1px)}.primary-button>svg{width:16px;height:16px}.primary-button .button-arrow{width:15px;margin-left:13px}.secondary-button{display:inline-flex;align-items:center;justify-content:center;gap:7px;background:white;border:1px solid #dce4d6;border-radius:8px;color:#526e58;padding:10px 13px;font-size:10px;font-weight:550;white-space:nowrap;min-height:37px}.secondary-button:hover{background:#eef4e8}.secondary-button svg{width:15px;height:15px}.settings-notice{font-size:11px;line-height:1.5;margin:14px 4px 0;color:#887441}.results{margin-top:34px}.results-header{display:flex;justify-content:space-between;align-items:center;gap:15px}.result-eyebrow{font-size:9px;color:#91a088;letter-spacing:.5px;margin-bottom:9px}.results-header h2{font-size:21px;letter-spacing:-.5px;margin:0;font-weight:600}.results-header h2 span{font-size:11px;letter-spacing:1px;padding:5px 7px;background:#e9eedf;border-radius:5px;color:#71905a;margin-left:7px;vertical-align:middle}.results-header p{font-size:10px;color:#8a9683;margin:9px 0 0}.result-toolbar{display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid #dfe6d8;margin-top:23px;gap:10px}.tabs{display:flex;gap:22px;align-items:center}.tabs button{border-bottom:2px solid transparent;background:transparent;font-size:11px;color:#8b9981;padding:13px 2px 12px;display:flex;gap:7px;align-items:center;min-height:40px}.tabs button[aria-selected=true]{border-bottom-color:var(--green);color:var(--green);font-weight:600}.tabs button span{font-size:8px;border-radius:4px;padding:2px 5px;background:#e5eddf;color:#688357}.tabs button svg{width:14px;height:14px}.progress-area{display:flex;gap:12px;align-items:center;font-size:9px;color:#91a088}.progress-track{height:4px;width:74px;border-radius:2px;background:#e2e9da;overflow:hidden}.progress-track span{display:block;height:100%;width:0;background:#74a281;transition:width .2s}.practice-tip{display:flex;gap:8px;align-items:center;padding:15px 1px 16px;color:#819176}.practice-tip svg{width:14px;height:14px}.practice-tip p{font-size:10px;margin:0;line-height:1.6}.task-list{display:grid;gap:12px}.task-card{background:white;border:1px solid var(--line);border-radius:12px;padding:19px 22px 0;transition:border-color .2s}.task-card.solved{border-color:#a9cbb2}.task-topline{display:flex;justify-content:space-between;align-items:center;gap:10px}.task-meta{display:flex;align-items:center;gap:10px}.task-index{font-size:10px;font-weight:650;color:#456d54}.task-tag{font-size:8px;line-height:1.4;padding:3px 7px;border-radius:4px;background:#f1f4eb;color:#899778}.solved-checkbox{display:flex;gap:5px;align-items:center;font-size:9px;color:#8a9981;cursor:pointer;padding:4px 0}.solved-checkbox input{width:13px;height:13px;margin:0;accent-color:var(--green)}.task-question{font-size:13px;line-height:1.75;color:#384d3e;margin:14px 0 17px;overflow-wrap:anywhere}.math{font-family:Georgia,"Times New Roman",serif;font-size:17px;letter-spacing:.1px;color:#294b35;white-space:normal}.task-question pre,.reveal-content pre{background:#f5f7f1;border:1px solid #e8ece1;border-radius:7px;padding:13px;font-size:11px;line-height:1.6;overflow-x:auto;max-width:100%;color:#455d49}.task-question code,.reveal-content code{font-family:ui-monospace,SFMono-Regular,Consolas,monospace}.task-reveals{border-top:1px solid #edf0e8;display:grid;grid-template-columns:1fr 1fr;gap:15px;padding-bottom:3px}.task-reveals details{min-width:0}.task-reveals summary{display:flex;gap:6px;align-items:center;cursor:pointer;font-size:10px;color:#809070;padding:12px 0;list-style:none;min-height:41px}.task-reveals summary::-webkit-details-marker{display:none}.task-reveals summary::after{content:"+";font-size:16px;margin-left:auto;color:#a7b09a}.task-reveals details[open] summary::after{content:"−"}.task-reveals details[open] summary{color:var(--green)}.task-reveals summary svg{width:13px;height:13px}.reveal-content{font-size:11px;line-height:1.8;background:#f6f8f1;padding:13px;border-radius:7px;margin-bottom:12px;color:#627457;overflow-wrap:anywhere}.reveal-content .math{font-size:15px}.answer-main{font-weight:600;color:#356247;margin:0 0 7px}.answer-explanation{margin:0}.completion-note{display:flex;align-items:center;gap:14px;margin:17px 0 0;padding:20px;background:#e6f1e2;border:1px solid #d4e7ce;border-radius:12px;color:#427548}.completion-note strong{font-size:13px}.completion-note p{margin:5px 0 0;font-size:11px}.prompt-panel{background:white;border:1px solid var(--line);border-radius:12px;padding:23px;margin-top:18px}.prompt-heading{display:flex;justify-content:space-between;align-items:center;gap:15px}.prompt-heading h3{font-size:14px;font-weight:600;margin:0}.prompt-heading p{font-size:10px;color:#8a987e;line-height:1.6;margin:7px 0 0}.prompt-panel pre{font-family:ui-monospace,SFMono-Regular,Consolas,monospace;font-size:11px;line-height:1.9;background:#f5f7f0;color:#59714f;padding:20px;border-radius:8px;white-space:pre-wrap;overflow-wrap:anywhere;border:1px solid #e6ecdE;margin:19px 0}.prototype-note{background:#eff4e7;border:1px solid #e0e9d4;border-radius:9px;padding:15px 17px;font-size:11px;line-height:1.75;color:#70845f}.prototype-note strong{color:#546e45;font-size:11px}.prototype-note p{margin:5px 0 0}.page-footer{display:flex;align-items:center;gap:22px;padding:30px 0 25px;font-size:9px;color:#a0ab96}.footer-brand{font-size:13px;letter-spacing:-.5px;font-weight:700;color:#9cae8f}.page-footer button{background:transparent;color:#85967a;margin-left:auto;font-size:9px;padding:8px 0}.page-footer button span{margin-left:8px}.modal{border:1px solid #dce5d4;border-radius:18px;padding:28px;color:var(--ink);width:min(560px,calc(100% - 32px));max-height:85vh;box-shadow:0 24px 120px #213e3430;background:#fcfdf9}.modal::backdrop{background:#1e342c65;backdrop-filter:blur(3px)}.modal-header{display:flex;justify-content:space-between;align-items:center;gap:10px}.modal-header h2{font-size:24px;letter-spacing:-.6px;margin:10px 0 0}.modal-header .eyebrow{font-size:8px}.icon-button{width:34px;height:34px;display:grid;place-items:center;border-radius:50%;background:#eef3e8;color:#668457}.icon-button:hover{background:#e1ecd7}.icon-button svg{width:17px;height:17px}.modal-intro{font-size:11px;line-height:1.8;color:#84927b;margin:17px 0 20px}.history-entry{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:14px;background:white;border:1px solid var(--line);border-radius:9px;margin-top:10px}.history-entry h3{font-size:12px;margin:0 0 6px;font-weight:600}.history-entry p{font-size:10px;color:#849777;margin:0;line-height:1.7}.empty-history{font-size:12px;color:#829574;padding:30px 0;text-align:center}.guide-step{display:flex;gap:17px;padding:23px 0;border-bottom:1px solid #e6ecdd}.guide-step>span{background:#e9f0e1;border-radius:7px;width:34px;height:34px;flex-shrink:0;display:grid;place-items:center;font-size:11px;color:#6d895b}.guide-step h3{font-size:13px;margin:0 0 7px}.guide-step p{font-size:11px;line-height:1.85;color:#7a8b6d;margin:0}.guide-modal .prototype-note{margin-top:22px}.toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:var(--green);color:white;padding:13px 20px;border-radius:10px;font-size:11px;line-height:1.6;box-shadow:0 5px 30px #163e2620;max-width:calc(100% - 32px);z-index:20;min-width:220px;text-align:center}.noscript{position:fixed;bottom:0;left:0;right:0;background:#fff4d1;padding:20px;text-align:center}
-@media(min-width:1450px){.content{padding-top:48px}.hero{margin-bottom:42px}.hero-art{margin-right:42px}.settings-grid{grid-template-columns:minmax(230px,1.25fr) minmax(250px,1.2fr) minmax(160px,.7fr)}}
-@media(max-width:1150px){.sidebar{width:208px;padding-left:16px;padding-right:16px}.brand{font-size:21px}.sidebar-label{font-size:7px;letter-spacing:1px}main{margin-left:208px;width:calc(100% - 208px)}.topbar{padding:0 30px}.content{padding:32px 30px 0}.settings-grid{grid-template-columns:minmax(170px,1.25fr) minmax(190px,1.3fr) minmax(106px,.7fr);gap:14px}.hero-art{width:300px;transform:scale(.9);transform-origin:right center;margin-right:0}.hero h1{font-size:46px}.config-card{padding:20px 20px 0}.stepper button{width:31px}}
-@media(max-width:960px){.sidebar{width:182px;padding-left:12px;padding-right:12px}.brand{font-size:19px;gap:7px}.brand-mark{width:30px;height:30px}.sidebar-label{font-size:6px;letter-spacing:.7px;margin-left:8px}.nav-item{font-size:11px;gap:9px}.nav-item svg{width:16px}.sidebar-note{padding:14px}.sidebar-note p{font-size:11px}.note-caption{font-size:9px}main{margin-left:182px;width:calc(100% - 182px)}.content{padding:28px 24px 0}.topbar{padding:0 24px}.hero-art{width:255px;transform:scale(.8)}.hero h1{font-size:42px}.settings-grid{grid-template-columns:1fr 1fr}.topic-field{grid-column:1/-1}.level-field{min-width:220px}.count-field{max-width:180px;justify-self:end;width:100%}.config-bottom p{font-size:9px}.primary-button{font-size:10px}.page-footer{gap:14px}.page-footer>span:nth-child(2){display:none}}
-@media(max-width:720px){.app-shell{display:block}.sidebar{position:relative;width:100%;border-right:0;border-bottom:1px solid var(--line);padding:18px 20px 0;display:block}.brand{font-size:22px;padding:0}.sidebar-label,.sidebar-note,.sidebar-bottom{display:none}.navigation{display:flex;margin-top:16px;gap:4px;justify-content:space-between}.nav-item{border-radius:7px 7px 0 0;padding:12px 10px;font-size:10px;gap:7px;min-height:42px}.nav-active-dot{display:none}.history-count{margin-left:3px}.navigation .nav-item.active{background:var(--mint)}main{margin-left:0;width:100%}.topbar{height:55px;padding:0 20px}.breadcrumb{font-size:9px;gap:10px}.prototype-badge{font-size:8px;padding:6px 8px}.content{padding:28px 20px 0}.hero{min-height:185px;margin-bottom:27px}.hero h1{font-size:39px;letter-spacing:-1.5px;margin-top:14px}.hero p{font-size:11px}.eyebrow{font-size:8px;letter-spacing:1.2px}.hero-art{width:225px;margin-left:-55px;transform:scale(.68);transform-origin:right center}.config-card{padding:20px 18px 0}.section-caption h2{font-size:13px}.section-caption>span{font-size:8px}.settings-grid{gap:18px}.config-bottom{gap:12px;align-items:flex-start;flex-direction:column}.config-bottom p{font-size:10px}.primary-button{width:100%;font-size:11px;justify-content:center}.results{margin-top:28px}.results-header h2{font-size:19px}.results-header p{font-size:9px}.secondary-button{font-size:9px;padding:9px 10px}.progress-area{font-size:8px;gap:7px}.progress-track{width:50px}.practice-tip p{font-size:9px}.task-card{padding:17px 17px 0}.task-question{font-size:12px}.task-reveals{gap:13px}.task-tag{font-size:7px}.reveal-content{font-size:10px;padding:11px}.math{font-size:16px}.page-footer{padding-top:23px}.prompt-panel{padding:17px}.prompt-heading{align-items:flex-start}.prompt-heading h3{font-size:13px}.prompt-panel pre{font-size:10px;padding:14px}.prototype-note{padding:13px;font-size:10px}}
-@media(max-width:440px){.hero-art{display:none}.hero{min-height:0}.hero h1{font-size:43px}.hero p br{display:none}.hero p{max-width:290px}.navigation .nav-item{padding:11px 6px;font-size:9px;gap:6px}.nav-item svg{width:15px}.topbar .breadcrumb{font-size:8px;gap:7px}.prototype-badge{font-size:7px}.content{padding-left:16px;padding-right:16px}.settings-grid{grid-template-columns:1fr}.topic-field{grid-column:auto}.level-field{min-width:0}.count-field{max-width:none;justify-self:auto}.stepper{max-width:150px}.count-field{display:grid;grid-template-columns:1fr 135px;align-items:center;gap:0 6px}.count-field>label{margin:0}.count-field .field-description{grid-column:1/-1}.stepper button{width:36px}.task-reveals{grid-template-columns:1fr;gap:0}.task-reveals details+details{border-top:1px solid #edf0e8}.progress-track{display:none}.tabs{gap:17px}.results-header .secondary-button{padding:9px 8px}.results-header h2 span{font-size:9px}.prompt-heading{flex-direction:column}.history-entry{padding:12px}.history-entry h3{font-size:11px}.modal{padding:22px}.page-footer button{font-size:8px}.task-question pre{font-size:10px}}
-/* Finishing touches: readable controls, useful status and a printable worksheet. */
-.hero{overflow:clip}
-.practice-overview{display:flex;align-items:center;gap:32px;border-top:1px solid var(--line);border-bottom:1px solid var(--line);padding:20px 2px;margin:0 0 28px}.practice-overview>div{display:flex;align-items:center;gap:10px}.practice-overview strong{font-size:26px;font-weight:600;letter-spacing:-1px;color:var(--green)}.practice-overview span{font-size:12px;line-height:1.5;color:#67796b;max-width:100px}.practice-overview>p{margin:0 0 0 auto;font-size:12px;color:#67796b;max-width:175px;line-height:1.6}.source-row{display:flex;align-items:center;gap:22px;border-top:1px solid var(--line);margin-top:22px;padding-top:20px}.source-row .field{flex:0 0 220px}.source-row select{width:100%;height:44px;border:1px solid var(--line);border-radius:8px;background:#fbfcf8;color:var(--ink);padding:0 12px;font-size:13px}.source-copy{font-size:12px;line-height:1.7;color:#586f60}.source-copy p{margin:0 0 4px}.source-copy span{font-size:11px;color:#6a795f}.variant-actions{display:flex;align-items:center;gap:10px;margin-top:22px;flex-wrap:wrap}.source-badge{font-size:11px;font-weight:600;border:1px solid #dce7d5;background:#eaf2e4;color:#48653e;border-radius:6px;padding:7px 10px}.export-answers{display:flex;align-items:center;gap:7px;margin-left:auto;font-size:12px;color:#53694e;min-height:42px;cursor:pointer}.export-answers input{accent-color:var(--green);width:16px;height:16px}.generation-status{display:flex;align-items:center;gap:12px;background:#eaf2e4;color:var(--green);padding:18px;border:1px solid #d7e5cf;border-radius:10px;margin-top:16px;font-size:13px;line-height:1.6}.spinner{width:18px;height:18px;border:2px solid #c3d5c1;border-top-color:var(--green);border-radius:50%;animation:spin .8s linear infinite;flex-shrink:0}@keyframes spin{to{transform:rotate(360deg)}}.generation-error,.model-warning{font-size:13px;line-height:1.7;padding:14px 17px;border-radius:9px;background:#fff4e7;color:#795021;border:1px solid #ebd7bd}.generation-error{margin:16px 0 0}.model-warning{margin-bottom:0}.model-text{white-space:pre-wrap;overflow-wrap:anywhere}.search-label{display:block;font-size:12px;margin:18px 0 8px;font-weight:600}.history-search{width:100%;border:1px solid #cfdcc9;background:#fff;border-radius:8px;font-size:14px;padding:12px;color:var(--ink);margin-bottom:8px}.primary-button:disabled,.secondary-button:disabled{opacity:.6;cursor:wait;transform:none}.history-entry>div{min-width:0;overflow-wrap:anywhere}.task-meta{flex-wrap:wrap}.task-card,.results,.task-list{min-width:0}.task-card{box-shadow:0 2px 8px #26401f03}.field>label,.field legend{font-size:12px}.field-description{font-size:11px;color:#6b7c65}.select-wrap select,.level-options span{font-size:12px}.primary-button{font-size:13px;min-height:46px}.secondary-button{font-size:12px;min-height:42px}.config-bottom p{font-size:12px;color:#64765c}.results-header p{font-size:12px;color:#6c7e63}.task-index{font-size:12px}.task-tag{font-size:10px;color:#5e744d}.solved-checkbox{font-size:12px;color:#5f7455;min-height:40px}.solved-checkbox input{width:16px;height:16px}.task-question{font-size:15px;line-height:1.85}.task-question pre,.reveal-content pre{font-size:13px}.task-reveals summary{font-size:13px;min-height:46px;color:#5f764f}.reveal-content{font-size:13px;color:#4e6444}.tabs button{font-size:13px;min-height:48px}.progress-area{font-size:11px;color:#607351}.practice-tip p{font-size:12px;color:#607351}.prompt-heading p,.modal-intro,.guide-step p{font-size:13px;color:#63765a}.guide-step h3{font-size:15px}.prompt-panel pre{font-size:12px;color:#47643c}.prototype-note,.prototype-note strong{font-size:12px}.history-entry h3{font-size:14px;line-height:1.6}.history-entry p{font-size:12px;color:#627954}.page-footer,.page-footer button{font-size:11px;color:#63785b}.toast{font-size:13px}.modal{scrollbar-gutter:stable}.task-topline{align-items:flex-start}.hero p{color:#627463}.nav-item{color:#536b5c}
-@media(max-width:960px){.source-row .field{flex-basis:190px}.practice-overview{gap:20px}.practice-overview>p{display:none}}
-@media(max-width:720px){.practice-overview{padding:15px 0;justify-content:space-between;margin-bottom:24px}.practice-overview strong{font-size:24px}.practice-overview span{font-size:11px}.source-row{align-items:stretch;flex-direction:column;gap:10px}.source-row .field{flex-basis:auto}.source-copy{font-size:12px}.variant-actions{gap:8px}.variant-actions .source-badge{margin-right:auto}.export-answers{margin-left:0}.variant-actions .secondary-button{flex:1}.task-question{font-size:15px}.task-tag{font-size:10px}.task-meta{gap:6px}.task-topline{gap:6px}.task-index{font-size:11px}.solved-checkbox{font-size:11px}.task-reveals{grid-template-columns:1fr;gap:0}.task-reveals details+details{border-top:1px solid #edf0e8}.reveal-content{font-size:13px}.practice-tip p{font-size:12px}.config-bottom{width:100%}.results-header{flex-wrap:wrap}.results-header p{line-height:1.7}.results-header .secondary-button{min-height:42px;font-size:12px}.history-entry{align-items:flex-start}.nav-item,.navigation .nav-item{font-size:11px;min-height:44px}.hero p{font-size:13px}.progress-area{font-size:10px}.prototype-badge{font-size:9px}.page-footer{flex-wrap:wrap;gap:10px}.page-footer button{font-size:11px}.hero-art{margin-right:-8px}.topbar{gap:8px}}
-@media(max-width:360px){.navigation .nav-item{font-size:10px;padding:10px 4px}.history-count{margin-left:0}.source-badge{font-size:10px}.task-topline{flex-wrap:wrap}.topbar{padding:0 16px}.breadcrumb{gap:5px}.prototype-badge{padding:6px;font-size:8px}.progress-area{font-size:9px}.tabs{gap:12px}.tabs button{font-size:12px}}
-@media print{@page{size:A4;margin:18mm}body{background:white;color:#111;font-size:12pt}.sidebar,.topbar,.hero,.practice-overview,.config-card,.settings-notice,.generation-status,.generation-error,.variant-actions,.result-toolbar,.practice-tip,.page-footer,.completion-note,.toast,.skip-link,.modal,.model-warning,.result-eyebrow,.results-header>button,.solved-checkbox,.task-reveals details:first-child{display:none!important}main{margin:0;width:100%}.content{padding:0;max-width:none}.results{margin:0}.results-header{margin-bottom:24px}.results-header h2{font-size:22pt}.results-header p{font-size:11pt;color:#333}.task-card{break-inside:avoid;box-shadow:none;border:1px solid #bbb;padding:14px 16px;margin:0 0 14px}.task-list{display:block}.task-question{font-size:11pt;line-height:1.7}.task-tag{color:#333;background:none}.task-index{color:#111}.task-reveals{display:block;border:0}.task-reveals details:not([open]){display:none}.task-reveals summary{display:none}.reveal-content{background:none;color:#222;padding:8px 0;border-top:1px solid #ddd;margin:0;font-size:10pt}.task-question pre,.reveal-content pre{white-space:pre-wrap;font-size:10pt}.math{color:#111}.prompt-panel{display:none!important}}
-@media(prefers-reduced-motion:reduce){*{scroll-behavior:auto!important;transition:none!important;animation:none!important}}
+:root {
+  --ink: #263b33;
+  --muted: #6c7b71;
+  --green: #175d4e;
+  --green-dark: #104b3e;
+  --mint: #edf3e8;
+  --lime: #dbeac5;
+  --paper: #f7f8f3;
+  --line: #e0e6dc;
+  --white: #fff;
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: var(--ink);
+  background: var(--paper);
+  font-synthesis: none;
+}
+* { box-sizing: border-box; }
+body { margin: 0; }
+button, input, select { font: inherit; }
+button, a, input, select, summary { -webkit-tap-highlight-color: transparent; }
+button { cursor: pointer; border: 0; }
+a { color: inherit; }
+svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.65; stroke-linecap: round; stroke-linejoin: round; flex-shrink: 0; }
+.icon-defs, [hidden] { display: none !important; }
+button:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible, a:focus-visible, pre:focus-visible { outline: 3px solid #77a797; outline-offset: 3px; }
+.sr-only { position: absolute; width: 1px; height: 1px; padding: 0; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+.skip-link { position: fixed; top: -60px; left: 16px; z-index: 30; padding: 12px; border-radius: 6px; background: var(--green); color: white; }
+.skip-link:focus { top: 12px; }
+.site-header { background: #fdfefb; border-bottom: 1px solid var(--line); }
+.header-inner { max-width: 1064px; margin: 0 auto; min-height: 68px; padding: 0 24px; display: flex; align-items: center; justify-content: space-between; gap: 24px; }
+.brand { display: inline-flex; align-items: center; gap: 9px; font-size: 23px; font-weight: 750; letter-spacing: -.9px; text-decoration: none; }
+.brand-mark { display: grid; place-items: center; width: 32px; height: 32px; padding-bottom: 4px; background: var(--green); color: #e7f1d9; border-radius: 9px; font-size: 26px; font-weight: 600; letter-spacing: 0; }
+.brand-dot { color: #83a575; }
+.navigation { display: flex; align-items: center; gap: 6px; }
+.nav-item { display: inline-flex; align-items: center; justify-content: center; gap: 7px; min-height: 38px; border-radius: 7px; padding: 9px 12px; background: transparent; color: #627363; font-size: 12px; font-weight: 500; white-space: nowrap; }
+.nav-item:hover { background: #f0f4eb; }
+.nav-item.active { background: #eaf1e3; color: var(--green); font-weight: 650; }
+.nav-item svg { width: 15px; height: 15px; }
+.history-count { min-width: 17px; padding: 1px 4px; border-radius: 4px; background: #eef2e8; font-size: 10px; color: #647958; text-align: center; }
+.content { max-width: 1064px; margin: 0 auto; padding: 28px 24px 0; }
+.hero { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 18px; min-width: 0; }
+.eyebrow { font-size: 10px; font-weight: 650; letter-spacing: 1.3px; color: #64805e; }
+.hero h1 { font-size: clamp(27px, 3vw, 34px); line-height: 1.2; letter-spacing: -1.2px; font-weight: 650; margin: 10px 0; }
+.hero h1 em { font-style: normal; color: #418267; }
+.hero-copy > p { margin: 0; font-size: 13px; line-height: 1.6; color: var(--muted); }
+.hero-note { display: flex; align-items: center; gap: 12px; padding: 16px 18px; border: 1px solid #dfe7d3; border-radius: 10px; background: #eef2e5; flex-shrink: 0; }
+.note-mark { display: grid; place-items: center; width: 30px; height: 36px; color: #729052; }
+.note-mark svg { width: 25px; height: 25px; }
+.hero-note strong { font-size: 12px; font-weight: 600; }
+.hero-note p { font-size: 11px; color: #6e8062; line-height: 1.6; margin: 5px 0 0; }
+.practice-overview { display: flex; align-items: center; gap: 16px; margin-bottom: 18px; color: #6e7d67; font-size: 11px; line-height: 1.6; }
+.practice-overview > div { display: flex; align-items: baseline; gap: 5px; }
+.practice-overview strong { color: #3e684b; font-size: 13px; font-weight: 650; }
+.overview-divider { width: 1px; height: 12px; background: #d9e1d2; }
+.storage-note { display: inline-flex; align-items: center; gap: 5px; margin-left: auto; font-size: 10px; color: #7b8974; }
+.storage-note svg { width: 12px; height: 12px; }
+.config-card { background: white; border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px 0; box-shadow: 0 2px 5px #29462403; }
+.section-caption { display: flex; justify-content: space-between; align-items: center; margin-bottom: 16px; gap: 12px; }
+.section-caption h2 { font-size: 14px; font-weight: 600; margin: 0; }
+.section-caption > span { font-size: 10px; color: #829178; }
+.settings-grid { display: grid; grid-template-columns: minmax(220px, 1.4fr) minmax(230px, 1.2fr) minmax(130px, .65fr); gap: 20px; }
+.field { min-width: 0; padding: 0; border: 0; margin: 0; }
+.field > label, .field legend { display: block; padding: 0; margin-bottom: 8px; font-size: 12px; font-weight: 550; }
+.field-description { display: block; margin-top: 7px; color: #77856e; font-size: 10px; line-height: 1.5; }
+.select-wrap { position: relative; }
+.select-wrap > svg { position: absolute; left: 11px; top: 12px; width: 15px; height: 15px; color: #7b8b71; pointer-events: none; }
+.select-wrap select { width: 100%; height: 40px; padding: 0 26px 0 34px; border: 1px solid #dfe5d9; border-radius: 7px; color: #405641; background: #fcfdf9; cursor: pointer; font-size: 12px; }
+.level-options { display: flex; padding: 3px; height: 40px; border: 1px solid #e4e9de; border-radius: 7px; background: #f3f5ef; }
+.level-options label { flex: 1; min-width: 0; position: relative; cursor: pointer; }
+.level-options input { position: absolute; opacity: 0; width: 100%; height: 100%; margin: 0; }
+.level-options span { display: flex; align-items: center; justify-content: center; height: 32px; border-radius: 5px; font-size: 11px; color: #77856e; pointer-events: none; white-space: nowrap; }
+.level-options input:checked + span { background: white; color: var(--green); font-weight: 650; box-shadow: 0 1px 4px #1f402210; }
+.level-options input:focus-visible + span { outline: 3px solid #77a797; outline-offset: 1px; }
+.stepper { display: flex; align-items: stretch; height: 40px; border: 1px solid #dfe5d9; border-radius: 7px; background: #fcfdf9; overflow: hidden; }
+.stepper button { width: 35px; flex-shrink: 0; color: #718568; background: transparent; font-size: 20px; }
+.stepper button:hover { background: #edf3e4; }
+.stepper button:disabled { color: #c2ccbc; cursor: default; }
+.stepper input { width: 100%; min-width: 20px; padding: 0; text-align: center; border: 0; background: transparent; color: var(--ink); font-size: 13px; font-weight: 600; -moz-appearance: textfield; }
+.stepper input::-webkit-inner-spin-button { appearance: none; }
+.config-footer { display: flex; align-items: center; justify-content: space-between; gap: 20px; border-top: 1px solid #edf0e7; margin-top: 16px; padding: 13px 0; }
+.source-settings { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; max-width: 400px; min-width: 0; }
+.source-settings select { height: 36px; max-width: 100%; min-width: 195px; padding: 0 10px; border: 1px solid #e0e6da; border-radius: 6px; background: #fbfcf8; color: #4c6346; font-size: 12px; cursor: pointer; }
+.connection-status { font-size: 10px; color: #7a896f; line-height: 1.5; }
+.config-bottom { display: flex; align-items: center; justify-content: flex-end; gap: 18px; }
+.config-bottom > p { display: flex; align-items: center; gap: 5px; max-width: 170px; font-size: 10px; line-height: 1.6; color: #7b886f; margin: 0; }
+.config-bottom > p svg { width: 13px; height: 13px; }
+.primary-button { display: inline-flex; align-items: center; justify-content: center; min-height: 41px; gap: 8px; padding: 10px 15px; background: var(--green); border-radius: 7px; color: white; font-size: 12px; font-weight: 600; white-space: nowrap; transition: background .15s; }
+.primary-button:hover { background: var(--green-dark); }
+.primary-button svg { width: 15px; height: 15px; }
+.button-arrow { margin-left: 8px; }
+.secondary-button { display: inline-flex; align-items: center; justify-content: center; min-height: 35px; gap: 6px; padding: 8px 10px; border: 1px solid #dce4d5; border-radius: 6px; color: #536d4c; background: #fff; font-size: 11px; font-weight: 500; white-space: nowrap; }
+.secondary-button:hover { background: #f1f6eb; }
+.secondary-button svg { width: 14px; height: 14px; }
+.primary-button:disabled, .secondary-button:disabled { opacity: .6; cursor: wait; }
+.results { margin-top: 25px; min-width: 0; }
+.results-header { display: flex; align-items: center; justify-content: space-between; gap: 15px; }
+.result-title-row { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.results-header h2 { margin: 0; font-size: 21px; line-height: 1.3; font-weight: 600; letter-spacing: -.5px; }
+.results-header h2 span { display: inline-block; padding: 4px 6px; border-radius: 5px; background: #e8efdf; color: #658249; font-size: 12px; font-weight: 600; letter-spacing: .5px; vertical-align: middle; margin-left: 4px; }
+.results-header p { margin: 7px 0 0; font-size: 11px; line-height: 1.6; color: #7b8971; }
+.source-badge { font-size: 10px; line-height: 1.5; color: #648052; }
+.result-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 16px; border-bottom: 1px solid #dce4d4; margin-top: 12px; }
+.tabs { display: flex; align-items: center; gap: 22px; align-self: stretch; }
+.tabs button { display: inline-flex; align-items: center; gap: 6px; padding: 13px 1px 12px; min-height: 43px; background: transparent; border-bottom: 2px solid transparent; color: #7b8b71; font-size: 12px; white-space: nowrap; }
+.tabs button[aria-selected=true] { color: var(--green); font-weight: 600; border-bottom-color: var(--green); }
+.tabs button span { display: inline-block; border-radius: 4px; padding: 1px 4px; background: #e6eddd; color: #637e4d; font-size: 9px; }
+.tabs button svg { width: 14px; height: 14px; }
+.variant-tools { display: flex; align-items: center; justify-content: flex-end; gap: 18px; flex-wrap: wrap; }
+.progress-area { display: flex; align-items: center; gap: 8px; color: #6d805c; font-size: 10px; white-space: nowrap; }
+.progress-track { width: 52px; height: 4px; border-radius: 2px; overflow: hidden; background: #e1e8d8; }
+.progress-track span { display: block; height: 100%; width: 0; background: #77a17b; transition: width .2s; }
+.variant-actions { display: flex; align-items: center; gap: 8px; }
+.export-answers { display: flex; align-items: center; gap: 6px; min-height: 36px; margin-right: 2px; color: #687e57; font-size: 11px; cursor: pointer; white-space: nowrap; }
+.export-answers input { width: 14px; height: 14px; accent-color: var(--green); margin: 0; }
+.practice-tip { display: flex; align-items: center; gap: 6px; padding: 12px 0; color: #819273; }
+.practice-tip svg { width: 14px; height: 14px; }
+.practice-tip p { margin: 0; font-size: 11px; line-height: 1.6; }
+.task-list { display: grid; gap: 10px; min-width: 0; }
+.task-card { min-width: 0; padding: 13px 17px 0; border: 1px solid var(--line); border-radius: 10px; background: white; }
+.task-card.solved { border-color: #a5c4a6; }
+.task-topline { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.task-meta { display: flex; align-items: center; gap: 9px; flex-wrap: wrap; padding: 5px 0; }
+.task-index { color: #4d7353; font-weight: 600; font-size: 11px; }
+.task-tag { padding: 2px 6px; border-radius: 4px; background: #f0f4e9; color: #768969; font-size: 10px; line-height: 1.5; }
+.solved-checkbox { display: flex; align-items: center; gap: 5px; min-height: 30px; color: #78886d; font-size: 11px; cursor: pointer; white-space: nowrap; }
+.solved-checkbox input { width: 14px; height: 14px; margin: 0; accent-color: var(--green); }
+.task-question { margin: 8px 0 12px; font-size: 14px; line-height: 1.8; color: #354f3b; overflow-wrap: anywhere; }
+.math { font-family: Georgia, "Times New Roman", serif; font-size: 18px; color: #31543b; white-space: normal; }
+.task-question pre, .reveal-content pre { margin: 10px 0; padding: 12px; border: 1px solid #e6ebdf; border-radius: 6px; background: #f6f8f1; color: #47623f; font-size: 12px; line-height: 1.65; overflow-x: auto; max-width: 100%; }
+.task-question code, .reveal-content code { font-family: ui-monospace, SFMono-Regular, Consolas, monospace; }
+.task-reveals { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; border-top: 1px solid #ecf0e6; }
+.task-reveals details { min-width: 0; }
+.task-reveals summary { display: flex; align-items: center; gap: 5px; min-height: 38px; padding: 10px 0; list-style: none; cursor: pointer; color: #728761; font-size: 11px; }
+.task-reveals summary::-webkit-details-marker { display: none; }
+.task-reveals summary::after { content: "+"; margin-left: auto; color: #9aab8e; font-size: 15px; }
+.task-reveals details[open] summary { color: var(--green); }
+.task-reveals details[open] summary::after { content: "−"; }
+.task-reveals summary svg { width: 13px; height: 13px; }
+.reveal-content { margin: 0 0 12px; padding: 12px; background: #f4f7ed; color: #576f4c; border-radius: 6px; font-size: 12px; line-height: 1.8; overflow-wrap: anywhere; }
+.reveal-content .math { font-size: 16px; }
+.answer-main { color: #366342; font-weight: 600; margin-bottom: 7px; }
+.answer-explanation { margin: 0; }
+.model-text { white-space: pre-wrap; overflow-wrap: anywhere; }
+.completion-note { display: flex; align-items: center; gap: 12px; margin-top: 14px; padding: 16px; border: 1px solid #d3e3c8; border-radius: 9px; background: #e9f2e1; color: #46723f; }
+.completion-note strong { font-size: 13px; }
+.completion-note p { margin: 5px 0 0; font-size: 12px; }
+.prompt-panel { margin-top: 14px; padding: 20px; border: 1px solid var(--line); border-radius: 10px; background: white; }
+.prompt-heading { display: flex; align-items: center; justify-content: space-between; gap: 14px; }
+.prompt-heading h3 { margin: 0; font-size: 15px; font-weight: 600; }
+.prompt-heading p { margin: 7px 0 0; font-size: 12px; line-height: 1.6; color: #7a8a6e; }
+.prompt-panel pre { margin: 16px 0; border: 1px solid #e3eada; border-radius: 7px; padding: 16px; background: #f5f7f0; color: #4f6c45; font: 12px/1.8 ui-monospace, SFMono-Regular, Consolas, monospace; white-space: pre-wrap; overflow-wrap: anywhere; }
+.prototype-note { padding: 13px 15px; border: 1px solid #dfe8d3; border-radius: 7px; background: #eff4e7; font-size: 12px; line-height: 1.75; color: #6b805b; }
+.prototype-note strong { color: #4f6e40; font-size: 12px; }
+.prototype-note p { margin: 5px 0 0; }
+.page-footer { display: flex; align-items: center; gap: 18px; padding: 22px 0; color: #8b987f; font-size: 10px; }
+.footer-brand { color: #7d936d; font-size: 13px; font-weight: 650; letter-spacing: -.5px; }
+.page-footer button { margin-left: auto; padding: 8px 0; background: transparent; color: #738966; font-size: 10px; }
+.page-footer button span { margin-left: 5px; }
+.modal { width: min(560px, calc(100% - 32px)); max-height: 85vh; padding: 24px; border: 1px solid #d9e2d1; border-radius: 12px; color: var(--ink); background: #fcfdf9; box-shadow: 0 20px 100px #1a352b30; scrollbar-gutter: stable; }
+.modal::backdrop { background: #1d35295e; backdrop-filter: blur(3px); }
+.modal-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.modal-header h2 { margin: 7px 0 0; font-size: 23px; font-weight: 600; letter-spacing: -.5px; }
+.modal-header .eyebrow { font-size: 9px; }
+.icon-button { display: grid; place-items: center; width: 34px; height: 34px; flex-shrink: 0; border-radius: 50%; background: #edf3e5; color: #698257; }
+.icon-button:hover { background: #e0ebd5; }
+.icon-button svg { width: 17px; height: 17px; }
+.modal-intro { margin: 16px 0; font-size: 12px; line-height: 1.8; color: #77886a; }
+.search-label { display: block; margin: 16px 0 8px; font-size: 12px; font-weight: 600; }
+.history-search { width: 100%; padding: 11px 12px; border: 1px solid #d7e1cc; border-radius: 7px; color: var(--ink); background: white; font-size: 13px; margin-bottom: 8px; }
+.history-entry { display: flex; align-items: center; justify-content: space-between; gap: 14px; margin-top: 10px; padding: 13px; border: 1px solid var(--line); border-radius: 8px; background: white; }
+.history-entry > div { min-width: 0; overflow-wrap: anywhere; }
+.history-entry h3 { font-size: 13px; line-height: 1.6; font-weight: 600; margin: 0 0 5px; }
+.history-entry p { margin: 0; font-size: 11px; line-height: 1.7; color: #758a64; }
+.empty-history { padding: 20px 0; text-align: center; font-size: 13px; color: #7b8e6b; }
+.guide-step { display: flex; gap: 16px; padding: 20px 0; border-bottom: 1px solid #e5ecdc; }
+.guide-step > span { display: grid; place-items: center; flex-shrink: 0; width: 32px; height: 32px; border-radius: 6px; background: #eaf1e1; color: #6f8a56; font-size: 11px; }
+.guide-step h3 { font-size: 14px; margin: 0 0 7px; }
+.guide-step p { font-size: 12px; line-height: 1.8; color: #75886a; margin: 0; }
+.guide-modal .prototype-note { margin-top: 20px; }
+.settings-notice { margin: 12px 0 0; color: #847342; font-size: 12px; line-height: 1.6; }
+.generation-status { display: flex; align-items: center; gap: 10px; margin-top: 14px; padding: 15px; border: 1px solid #d7e3cb; border-radius: 8px; color: var(--green); background: #eaf2e3; font-size: 12px; line-height: 1.7; }
+.spinner { width: 17px; height: 17px; border: 2px solid #c6d9bb; border-top-color: var(--green); border-radius: 50%; animation: spin .8s linear infinite; flex-shrink: 0; }
+@keyframes spin { to { transform: rotate(360deg); } }
+.generation-error, .model-warning { margin: 14px 0 0; padding: 13px 15px; border: 1px solid #e8d7b9; border-radius: 8px; background: #fff5e5; color: #7f5b2c; font-size: 12px; line-height: 1.7; }
+.toast { position: fixed; bottom: 22px; left: 50%; transform: translateX(-50%); z-index: 30; max-width: calc(100% - 32px); padding: 12px 18px; border-radius: 8px; background: var(--green); color: white; box-shadow: 0 5px 25px #174d3020; font-size: 12px; line-height: 1.6; text-align: center; }
+.noscript { position: fixed; bottom: 0; left: 0; right: 0; background: #fff4d1; padding: 20px; text-align: center; }
+@media (max-width: 900px) {
+  .header-inner, .content { padding-left: 20px; padding-right: 20px; }
+  .settings-grid { grid-template-columns: minmax(190px, 1.2fr) minmax(210px, 1.2fr) minmax(110px, .7fr); gap: 14px; }
+  .config-bottom { gap: 12px; }
+  .config-bottom > p { max-width: 130px; font-size: 9px; }
+  .variant-tools { gap: 12px; }
+  .progress-track { display: none; }
+}
+@media (max-width: 720px) {
+  .header-inner { flex-wrap: wrap; gap: 12px; padding-top: 16px; padding-bottom: 0; }
+  .brand { font-size: 21px; }
+  .navigation { width: 100%; justify-content: space-between; gap: 3px; }
+  .nav-item { flex: 1; border-radius: 6px 6px 0 0; font-size: 11px; padding: 11px 8px; min-height: 42px; }
+  .content { padding-top: 22px; }
+  .hero h1 { font-size: 29px; }
+  .hero-note { padding: 13px; gap: 8px; }
+  .hero-note p { font-size: 10px; }
+  .hero-note strong { font-size: 11px; }
+  .note-mark { width: 23px; }
+  .hero-copy > p { font-size: 12px; }
+  .storage-note { display: none; }
+  .practice-overview { gap: 12px; }
+  .config-card { padding: 16px 16px 0; }
+  .settings-grid { grid-template-columns: minmax(200px, 1.5fr) minmax(120px, .8fr); gap: 16px; }
+  .topic-field { grid-column: 1 / -1; }
+  .config-footer { align-items: flex-start; gap: 14px; }
+  .config-bottom { flex-direction: column-reverse; align-items: flex-end; gap: 7px; }
+  .config-bottom > p { max-width: none; font-size: 10px; }
+  .result-toolbar { align-items: stretch; flex-wrap: wrap; gap: 0; }
+  .tabs { order: 2; }
+  .variant-tools { width: 100%; order: 1; justify-content: space-between; margin-top: 10px; gap: 8px; }
+  .variant-actions { gap: 6px; }
+  .variant-actions .secondary-button { padding: 7px 9px; font-size: 10px; }
+  .progress-area { font-size: 10px; }
+  .task-question { font-size: 14px; }
+  .results-header p { font-size: 11px; }
+  .page-footer { gap: 12px; }
+}
+@media (max-width: 540px) {
+  .hero-note { display: none; }
+  .header-inner, .content { padding-left: 16px; padding-right: 16px; }
+  .hero { margin-bottom: 14px; }
+  .hero h1 { font-size: 29px; letter-spacing: -.9px; }
+  .eyebrow { font-size: 9px; letter-spacing: 1.1px; }
+  .practice-overview { font-size: 10px; flex-wrap: wrap; row-gap: 3px; }
+  .practice-overview strong { font-size: 12px; }
+  .settings-grid { grid-template-columns: 1fr; gap: 15px; }
+  .topic-field { grid-column: auto; }
+  .count-field { display: grid; grid-template-columns: 1fr 120px; align-items: center; column-gap: 12px; }
+  .count-field > label { margin: 0; }
+  .count-field .field-description { grid-column: 1 / -1; }
+  .config-footer { flex-direction: column; align-items: stretch; gap: 12px; }
+  .source-settings { max-width: none; }
+  .source-settings select { width: 100%; height: 39px; }
+  .connection-status { font-size: 10px; }
+  .config-bottom { align-items: stretch; gap: 9px; }
+  .config-bottom > p { justify-content: center; }
+  .primary-button { min-height: 43px; width: 100%; font-size: 13px; }
+  .section-caption > span { font-size: 9px; }
+  .results { margin-top: 22px; }
+  .results-header { align-items: flex-start; gap: 10px; }
+  .results-header h2 { font-size: 19px; }
+  .result-title-row { gap: 5px; }
+  .source-badge { flex-basis: 100%; }
+  .results-header > button { padding: 8px; font-size: 10px; margin-top: 1px; }
+  .results-header > button svg { width: 13px; }
+  .variant-tools { flex-wrap: wrap; gap: 10px; }
+  .progress-area { width: 100%; }
+  .progress-track { display: block; width: 70px; }
+  .variant-actions { width: 100%; justify-content: space-between; }
+  .variant-actions .secondary-button { font-size: 11px; min-height: 37px; }
+  .export-answers { font-size: 11px; }
+  .task-card { padding: 12px 14px 0; }
+  .task-reveals { gap: 14px; }
+  .task-meta { gap: 6px; }
+  .task-tag { font-size: 9px; }
+  .task-question pre { font-size: 11px; }
+  .task-reveals summary { font-size: 10px; }
+  .reveal-content { font-size: 12px; padding: 10px; }
+  .prompt-panel { padding: 16px; }
+  .prompt-heading { align-items: flex-start; }
+  .prompt-heading h3 { font-size: 14px; }
+  .prompt-heading p { font-size: 11px; }
+  .prompt-panel pre { font-size: 11px; padding: 12px; }
+  .page-footer > span:nth-child(2) { display: none; }
+  .history-entry { align-items: flex-start; gap: 10px; }
+  .history-entry h3 { font-size: 12px; }
+  .modal { padding: 20px; }
+}
+@media (max-width: 360px) {
+  .nav-item { padding: 11px 5px; font-size: 10px; gap: 5px; }
+  .nav-item svg { display: none; }
+  .hero h1 { font-size: 26px; }
+  .section-caption h2 { font-size: 13px; }
+  .overview-divider { display: none; }
+  .practice-overview { gap: 10px; }
+  .task-reveals { grid-template-columns: 1fr; gap: 0; }
+  .task-reveals details + details { border-top: 1px solid #edf0e7; }
+  .task-reveals summary { font-size: 11px; }
+  .task-meta { gap: 4px; }
+}
+@media print {
+  @page { size: A4; margin: 18mm; }
+  body { background: white; color: #111; font-size: 12pt; }
+  .site-header, .hero, .practice-overview, .config-card, .settings-notice, .generation-status, .generation-error, .variant-actions, .result-toolbar, .practice-tip, .page-footer, .completion-note, .toast, .skip-link, .modal, .model-warning, .source-badge, .results-header > button, .solved-checkbox, .task-reveals details:first-child { display: none !important; }
+  .content { padding: 0; max-width: none; }
+  .results { margin: 0; }
+  .results-header { margin-bottom: 24px; }
+  .results-header h2 { font-size: 22pt; }
+  .results-header p { font-size: 11pt; color: #333; }
+  .task-card { break-inside: avoid; box-shadow: none; border: 1px solid #bbb; padding: 14px 16px; margin: 0 0 14px; }
+  .task-list { display: block; }
+  .task-question { font-size: 11pt; line-height: 1.7; }
+  .task-tag { color: #333; background: none; }
+  .task-index { color: #111; }
+  .task-reveals { display: block; border: 0; }
+  .task-reveals details:not([open]), .task-reveals summary { display: none; }
+  .reveal-content { background: none; color: #222; padding: 8px 0; border-top: 1px solid #ddd; margin: 0; font-size: 10pt; }
+  .task-question pre, .reveal-content pre { white-space: pre-wrap; font-size: 10pt; }
+  .math { color: #111; }
+  .prompt-panel { display: none !important; }
+}
+@media (prefers-reduced-motion: reduce) {
+  * { scroll-behavior: auto !important; transition: none !important; animation: none !important; }
+}
 
 </style>
 </head>
@@ -39,28 +334,28 @@
     <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
     <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
     <symbol id="i-bulb" viewBox="0 0 24 24"><path d="M9 18h6m-5 3h4M8 15c-4-4-2-11 4-11s8 7 4 11l-1 3H9Z"/></symbol>
+    <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-4-4 4 4 4-4M4 15v5h16v-5"/></symbol>
+    <symbol id="i-printer" viewBox="0 0 24 24"><path d="M6 8V3h12v5M6 17H3V8h18v9h-3M6 14h12v7H6Z"/><path d="M17 11h1"/></symbol>
   </defs></svg>
   <a class="skip-link" href="#main">Перейти к заданиям</a>
   <div class="app-shell">
-    <aside class="sidebar" aria-label="Главное меню">
-      <a class="brand" href="./" aria-label="Практикум — главная"><span class="brand-mark">п</span><span>практикум<span class="brand-dot">.</span></span></a>
-      <div class="sidebar-label">ТВОЁ УЧЕБНОЕ ПРОСТРАНСТВО</div>
-      <nav class="navigation">
-        <button class="nav-item active" id="nav-generator" type="button"><svg><use href="#i-grid"/></svg>Генератор<span class="nav-active-dot"></span></button>
-        <button class="nav-item" id="nav-history" type="button"><svg><use href="#i-clock"/></svg>Мои варианты<span class="history-count" id="history-count">0</span></button>
-        <button class="nav-item" id="nav-guide" type="button"><svg><use href="#i-book"/></svg>Как это работает</button>
-      </nav>
-      <div class="sidebar-note"><span class="note-icon">✦</span><h3>По одному шагу</h3><p>Сначала попробуй сам. Потом открой подсказку. Ответ подождёт.</p><span class="note-line"></span><span class="note-caption">Твой темп — правильный темп.</span></div>
-      <div class="sidebar-bottom"><span class="avatar">С</span><div><strong>Твоя практика</strong><span>Сохранено в этом браузере</span></div></div>
-    </aside>
+    <header class="site-header">
+      <div class="header-inner">
+        <a class="brand" href="./" aria-label="Практикум — главная"><span class="brand-mark">п</span><span>практикум<span class="brand-dot">.</span></span></a>
+        <nav class="navigation" aria-label="Главное меню">
+          <button class="nav-item active" id="nav-generator" type="button"><svg><use href="#i-grid"/></svg>Генератор</button>
+          <button class="nav-item" id="nav-history" type="button"><svg><use href="#i-clock"/></svg>Мои варианты<span class="history-count" id="history-count">0</span></button>
+          <button class="nav-item" id="nav-guide" type="button"><svg><use href="#i-book"/></svg>Как это работает</button>
+        </nav>
+      </div>
+    </header>
     <main id="main">
-      <header class="topbar"><div class="breadcrumb">Учебное пространство<span>/</span><strong>Генератор</strong></div><span class="prototype-badge"><span></span>Автономная версия</span></header>
       <div class="content">
         <section class="hero" aria-labelledby="hero-title">
-          <div class="hero-copy"><div class="eyebrow"><span></span>ГОТОВИМСЯ К ЭКЗАМЕНУ</div><h1 id="hero-title">Понять. Решить.<br><em>Сдать.</em></h1><p>Практика, которая подходит тебе.<br>Выбери тему и собери свой вариант заданий.</p></div>
-          <div class="hero-art" aria-hidden="true"><div class="orbit"></div><div class="art-dot dot-one"></div><div class="art-dot dot-two"></div><div class="paper"><span class="paper-caption">ПЛАН НА СЕГОДНЯ</span><div class="paper-row"><span class="paper-check">✓</span><span>Разобраться в теме</span></div><div class="paper-row"><span class="paper-check">✓</span><span>Попробовать самому</span></div><div class="paper-row"><span class="paper-box"></span><span>Сдать уверенно</span></div><div class="paper-formula">a + bi <span>→</span> всё получится</div></div><div class="art-sticker">+1 к уверенности <span>↗</span></div><span class="art-star">✳</span></div>
+          <div class="hero-copy"><div class="eyebrow">ТВОЯ ЕЖЕДНЕВНАЯ ПРАКТИКА</div><h1 id="hero-title">Понять. Решить. <em>Сдать.</em></h1><p>Выбери тему и собери свой вариант заданий.</p></div>
+          <aside class="hero-note"><span class="note-mark" aria-hidden="true"><svg><use href="#i-bulb"/></svg></span><div><strong>По одному шагу</strong><p>Сначала попробуй сам.<br>Подсказки будут рядом.</p></div></aside>
         </section>
-        <div class="practice-overview" aria-label="Прогресс в истории этого браузера"><div><strong id="saved-variants">0</strong><span id="saved-variants-label">вариантов в истории</span></div><div><strong id="solved-total">0</strong><span>Заданий решено</span></div><p>Каждый подход — ещё один шаг к экзамену.</p></div>
+        <div class="practice-overview" aria-label="Прогресс в истории этого браузера"><div><strong id="saved-variants">0</strong><span id="saved-variants-label">вариантов в истории</span></div><span class="overview-divider" aria-hidden="true"></span><div><strong id="solved-total">0</strong><span>заданий отмечено решёнными</span></div><span class="storage-note"><svg><use href="#i-check"/></svg>Сохранено в этом браузере</span></div>
         <section class="config-card" aria-labelledby="config-title">
           <div class="section-caption"><h2 id="config-title">Настрой свою практику</h2><span>01 / Параметры</span></div>
           <form id="generator-form">
@@ -69,18 +364,22 @@
               <fieldset class="field level-field"><legend>Уровень сложности</legend><div class="level-options"><label><input type="radio" name="level" value="easy" checked><span>Базовый</span></label><label><input type="radio" name="level" value="medium"><span>Средний</span></label><label><input type="radio" name="level" value="hard"><span>Сложный</span></label></div><span class="field-description" id="level-description">Чтобы разобраться в основах</span></fieldset>
               <div class="field count-field"><label for="count">Количество заданий</label><div class="stepper"><button type="button" id="decrease" aria-label="Уменьшить количество">−</button><input id="count" name="count" type="number" min="1" max="10" step="1" value="5" required inputmode="numeric"><button type="button" id="increase" aria-label="Увеличить количество">+</button></div><span class="field-description">От 1 до 10 за один подход</span></div>
             </div>
-            <div class="source-row"><div class="field"><label for="source">Как создать задания</label><select id="source" name="source"><option value="local">Обычная практика</option><option value="ai" id="ai-option" disabled>С помощью ИИ</option></select></div><div class="source-copy"><p id="source-description">Проверенные шаблоны со случайными числами. Работает без подключения ИИ.</p><span id="connection-status">Проверяем доступность ИИ…</span></div></div>
-            <div class="config-bottom"><p><svg><use href="#i-clock"/></svg><span id="time-estimate">Примерно 15 минут практики</span></p><button class="primary-button" type="submit" id="generate-button"><svg><use href="#i-spark"/></svg>Сгенерировать задания<svg class="button-arrow"><use href="#i-arrow"/></svg></button></div>
+            <div class="config-footer">
+              <div class="source-settings"><label for="source" class="sr-only">Как создать задания</label><select id="source" name="source" aria-describedby="source-description connection-status"><option value="local">Обычная практика</option><option value="ai" id="ai-option" disabled>С помощью ИИ</option></select><span id="source-description" class="sr-only">Проверенные шаблоны со случайными числами. Работает без подключения ИИ.</span><span id="connection-status" class="connection-status">Проверяем доступность ИИ…</span></div>
+              <div class="config-bottom"><p><svg><use href="#i-clock"/></svg><span id="time-estimate">Примерно 15 минут практики</span></p><button class="primary-button" type="submit" id="generate-button"><svg><use href="#i-spark"/></svg>Создать вариант<svg class="button-arrow"><use href="#i-arrow"/></svg></button></div>
+            </div>
           </form>
         </section>
         <div id="generation-status" class="generation-status" role="status" hidden><span class="spinner" aria-hidden="true"></span>Собираем твой вариант. Обычно это занимает меньше минуты…</div>
         <p id="generation-error" class="generation-error" role="alert" hidden></p>
         <div id="settings-notice" class="settings-notice" hidden>Настройки изменены. Сгенерируй задания, чтобы применить их к новому варианту.</div>
         <section class="results" aria-labelledby="results-title">
-          <div class="results-header"><div><div class="result-eyebrow">02 / Практика</div><h2 id="results-title">Твой вариант <span id="variant-number">001</span></h2><p id="variant-summary">Комплексные числа · Базовый · 5 заданий</p></div><button class="secondary-button" type="button" id="regenerate"><svg><use href="#i-refresh"/></svg>Новый вариант</button></div>
-          <div class="variant-actions"><span id="variant-source" class="source-badge">Локальные шаблоны</span><label class="export-answers"><input id="include-answers" type="checkbox">С ответами</label><button type="button" class="secondary-button" id="download-variant" aria-label="Скачать вариант текстовым файлом">Скачать .txt</button><button type="button" class="secondary-button" id="print-variant">Печать / PDF</button></div>
+          <div class="results-header"><div><div class="result-title-row"><h2 id="results-title">Твой вариант <span id="variant-number">001</span></h2><span id="variant-source" class="source-badge">Локальные шаблоны</span></div><p id="variant-summary">Комплексные числа · Базовый · 5 заданий</p></div><button class="secondary-button" type="button" id="regenerate"><svg><use href="#i-refresh"/></svg>Новый вариант</button></div>
           <p id="model-warning" class="model-warning" hidden>Вариант создан языковой моделью. Она может ошибаться — проверь ответы и рассуждения перед использованием.</p>
-          <div class="result-toolbar"><div class="tabs" role="tablist" aria-label="Содержание варианта"><button id="tasks-tab" role="tab" aria-controls="tasks-panel" aria-selected="true" tabindex="0" type="button">Задания<span id="task-count">5</span></button><button id="prompt-tab" role="tab" aria-controls="prompt-panel" aria-selected="false" tabindex="-1" type="button"><svg><use href="#i-code"/></svg>Промпт</button></div><div class="progress-area"><span id="progress-label">Решено 0 из 5</span><div class="progress-track" aria-hidden="true"><span id="progress-fill"></span></div></div></div>
+          <div class="result-toolbar">
+            <div class="tabs" role="tablist" aria-label="Содержание варианта"><button id="tasks-tab" role="tab" aria-controls="tasks-panel" aria-selected="true" tabindex="0" type="button">Задания<span id="task-count">5</span></button><button id="prompt-tab" role="tab" aria-controls="prompt-panel" aria-selected="false" tabindex="-1" type="button"><svg><use href="#i-code"/></svg>Промпт</button></div>
+            <div class="variant-tools"><div class="progress-area"><span id="progress-label">Решено 0 из 5</span><div class="progress-track" aria-hidden="true"><span id="progress-fill"></span></div></div><div class="variant-actions"><label class="export-answers"><input id="include-answers" type="checkbox">С ответами</label><button type="button" class="secondary-button" id="download-variant" aria-label="Скачать вариант текстовым файлом"><svg><use href="#i-download"/></svg>Скачать</button><button type="button" class="secondary-button" id="print-variant"><svg><use href="#i-printer"/></svg>Печать / PDF</button></div></div>
+          </div>
           <div id="tasks-panel" role="tabpanel" aria-labelledby="tasks-tab"><div class="practice-tip"><svg><use href="#i-bulb"/></svg><p>Решай в тетради. Если застрял — открой подсказку, а затем проверь ответ.</p></div><div id="task-list" class="task-list"></div><div class="completion-note" id="completion-note" hidden><svg><use href="#i-check"/></svg><div><strong>Вариант пройден!</strong><p>Можно закрепить результат новым набором заданий.</p></div></div></div>
           <div id="prompt-panel" class="prompt-panel" role="tabpanel" aria-labelledby="prompt-tab" hidden><div class="prompt-heading"><div><h3>От настроек — к точному промпту</h3><p>Роль, контекст, сложность и формат ответа в одном запросе.</p></div><button id="copy-prompt" type="button" class="secondary-button"><svg><use href="#i-copy"/></svg>Копировать</button></div><pre id="prompt-text" tabindex="0"></pre><div class="prototype-note"><strong id="prompt-note-title">Промпт для эксперимента</strong><p id="prompt-note-text">Этот вариант создан локально по шаблонам. Промпт можно скопировать и проверить в отдельном чате.</p></div></div>
         </section>
