@@ -1,0 +1,102 @@
+import assert from 'node:assert/strict';
+import {test} from 'node:test';
+import {once} from 'node:events';
+import {createApp} from '../server.mjs';
+import {displayModelTasks, validateModelResult} from '../dist/ai.mjs';
+import {exportVariant} from '../dist/export.mjs';
+import {readSaved} from '../dist/app.mjs';
+import {makeTasks} from '../dist/generator.mjs';
+
+const config={topic:'complex',level:'easy',count:1};
+const result={topic:'complex',difficulty:'easy',tasks:[{type:'Сложение',question:'Найди 1 + i + 2 + i.',hint:'Сложи действительные части.',answer:'3 + 2i',explanation:'1 + 2 = 3, i + i = 2i.'}]};
+const settings={LLM_API_KEY:'test-only-not-a-real-key',LLM_MODEL:'test-model',LLM_BASE_URL:'https://example.invalid/v1'};
+const answer=(data=result)=>new Response(JSON.stringify({choices:[{message:{content:JSON.stringify(data)}}]}),{headers:{'Content-Type':'application/json'}});
+
+async function running(t, options={}) {
+  const server=createApp({settings:{},...options});
+  server.listen(0,'127.0.0.1');await once(server,'listening');
+  t.after(()=>new Promise(resolve=>{server.close(resolve);server.closeAllConnections();}));
+  const base=`http://127.0.0.1:${server.address().port}`;
+  return {get:path=>fetch(base+path),post:(data={config,variantId:1},headers={})=>fetch(base+'/api/generate',{method:'POST',headers:{'Content-Type':'application/json',...headers},body:JSON.stringify(data)})};
+}
+
+test('ordinary site works without credentials and does not expose configuration',async t=>{
+  const app=await running(t);
+  assert.deepEqual(await (await app.get('/api/status')).json(),{aiAvailable:false});
+  for(const path of ['/','/styles.css','/app.mjs','/generator.mjs','/ai.mjs','/export.mjs']) {
+    const response=await app.get(path);assert.equal(response.status,200);assert.ok((await response.text()).length>100);
+    assert.equal(response.headers.get('x-content-type-options'),'nosniff');
+  }
+  for(const path of ['/.env','/server.mjs','/package.json','/%2e%2e/server.mjs','/dist/../.env'])assert.equal((await app.get(path)).status,404);
+  const unavailable=await app.post();assert.equal(unavailable.status,503);assert.match((await unavailable.json()).error,/пока не подключён/);
+});
+
+test('model request uses server credentials, validated settings and the displayed prompt',async t=>{
+  let received;
+  const app=await running(t,{settings,fetchModel:async(url,init)=>{received={url,init};return answer();}});
+  assert.deepEqual(await(await app.get('/api/status')).json(),{aiAvailable:true});
+  const response=await app.post();assert.equal(response.status,200);assert.deepEqual(await response.json(),{result});
+  assert.equal(received.url,'https://example.invalid/v1/chat/completions');
+  assert.equal(received.init.headers.Authorization,'Bearer '+settings.LLM_API_KEY);
+  const body=JSON.parse(received.init.body);assert.equal(body.model,'test-model');assert.match(body.messages[1].content,/Комплексные числа/);
+  assert.ok(!JSON.stringify(await(await app.get('/api/status')).json()).includes(settings.LLM_API_KEY));
+});
+
+test('invalid inputs, content types and cross-origin requests do not call the provider',async t=>{
+  let calls=0;
+  const app=await running(t,{settings,fetchModel:async()=>{calls++;return answer();}});
+  assert.equal((await app.post({config:{...config,count:11},variantId:1})).status,400);
+  assert.equal((await app.post({config,variantId:0})).status,400);
+  assert.equal((await app.post(null)).status,400);
+  assert.equal((await app.post({padding:'x'.repeat(5000)})).status,413);
+  assert.equal((await app.post({}, {'Content-Type':'text/plain'})).status,415);
+  assert.equal((await app.post({config,variantId:1},{Origin:'https://evil.invalid'})).status,403);
+  assert.equal((await app.post({config,variantId:1},{'Sec-Fetch-Site':'cross-site'})).status,403);
+  assert.equal(calls,0);
+});
+
+test('provider failures are useful and never leak credentials or provider response bodies',async t=>{
+  for(const code of [401,403,429,500])await t.test(String(code),async t=>{
+    const app=await running(t,{settings,fetchModel:async()=>new Response('provider secret '+settings.LLM_API_KEY,{status:code})});
+    const response=await app.post();assert.equal(response.status,code===429?429:502);
+    const text=await response.text();assert.ok(!text.includes(settings.LLM_API_KEY));assert.match(text,/error/);
+  });
+});
+
+test('invalid or excessively large model output leaves no accepted variant',async t=>{
+  for(const data of [{...result,topic:'sets'},{...result,tasks:[]},{...result,tasks:[{...result.tasks[0],answer:''}]}]) {
+    const app=await running(t,{settings,fetchModel:async()=>answer(data)});
+    assert.equal((await app.post()).status,502);
+  }
+  const app=await running(t,{settings,fetchModel:async()=>new Response('x'.repeat(210000))});
+  assert.equal((await app.post()).status,413);
+});
+
+test('network timeouts, rate limits and insecure provider URLs are handled',async t=>{
+  const timeout=await running(t,{settings,fetchModel:async()=>{throw new DOMException('timed out','TimeoutError');}});
+  assert.equal((await timeout.post()).status,504);
+  const rate=await running(t,{settings,fetchModel:async()=>answer()});
+  for(let i=0;i<10;i++)assert.equal((await rate.post()).status,200);
+  assert.equal((await rate.post()).status,429);
+  const insecure=await running(t,{settings:{...settings,LLM_BASE_URL:'http://example.invalid/v1'}});
+  assert.deepEqual(await(await insecure.get('/api/status')).json(),{aiAvailable:false});
+});
+
+test('model text is escaped and duplicate questions are rejected',()=>{
+  const malicious={...result,tasks:[{...result.tasks[0],question:'<img src=x onerror="alert(1)"> & текст'}]};
+  const task=displayModelTasks(malicious,config)[0];assert.ok(!task.question.includes('<img'));assert.match(task.question,/&lt;img/);
+  assert.throws(()=>validateModelResult({...result,tasks:[result.tasks[0],{...result.tasks[0],question:result.tasks[0].question.toUpperCase()}]},{...config,count:2}));
+});
+
+test('history preserves generated model content and active selection; corrupt entries are ignored',()=>{
+  const variant={id:1,seed:0,config,source:'ai',result,created:'2026-10-21T10:00:00Z',solved:[true]};
+  const saved=readSaved({getItem:()=>JSON.stringify({version:1,sequence:3,activeId:1,history:[{...variant,id:2,result:null},variant,variant]})});
+  assert.equal(saved.history.length,1);assert.deepEqual(saved.history[0].result,result);assert.equal(saved.activeId,1);assert.deepEqual(saved.history[0].solved,[true]);
+});
+
+test('download includes the current worksheet and answers only on request',()=>{
+  const variant={id:1,seed:42,config,source:'local',created:'2026-10-21T10:00:00Z'};
+  const tasks=makeTasks(config,42);
+  const blank=exportVariant(variant,tasks);assert.match(blank,/ЗАДАНИЕ 1/);assert.ok(!blank.includes('Ответ:'));assert.ok(!/<\/?(?:span|pre|code|sup)>/.test(blank));
+  const full=exportVariant(variant,tasks,true);assert.match(full,/Ответ:/);assert.match(full,/Решение:/);
+});

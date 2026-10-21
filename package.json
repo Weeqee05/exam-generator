@@ -8,8 +8,9 @@
     "node": ">=18"
   },
   "scripts": {
-    "dev": "python -m http.server 8000 --directory dist",
-    "start": "python -m http.server 8000 --directory dist",
-    "test": "node tests/verify.mjs"
+    "dev": "node server.mjs",
+    "start": "node server.mjs",
+    "export:offline": "node scripts/export-offline.mjs",
+    "test": "node tests/verify.mjs && node --test tests/server.test.mjs"
   }
 }

@@ -108,4 +108,4 @@ assert.ok(index.includes('lang="ru"')&&index.includes('name="viewport"')&&index.
 assert.ok(!/https?:\/\//.test(fs.readFileSync(new URL('../dist/app.mjs',import.meta.url),'utf8')),'No runtime external API calls');
 console.log(`PASS: ${variants} variants; ${checkedTasks} task calculations; ${pythonCases.length} Python executions.`);
 console.log('PASS: generation, all settings, regeneration, hidden hint/answer markup, progress, tabs/keyboard, history/restore, validation/bounds, 20-item limit, corrupt/blocked storage, guide and copy fallback.');
-console.log('LIMIT: UI tested at event/state level using a DOM adapter. No browser rendering test was available.');
+console.log('LIMIT: this suite uses a DOM adapter. Run tests/browser.py separately for real-browser checks.');
