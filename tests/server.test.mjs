@@ -1,7 +1,12 @@
 import assert from 'node:assert/strict';
 import {test} from 'node:test';
 import {once} from 'node:events';
-import {createApp} from '../server.mjs';
+import * as http from 'node:http';
+import {spawn} from 'node:child_process';
+import {mkdtemp, writeFile, rm} from 'node:fs/promises';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {createApp, loadProviderSettings} from '../server.mjs';
 import {displayModelTasks, validateModelResult} from '../dist/ai.mjs';
 import {exportVariant} from '../dist/export.mjs';
 import {readSaved} from '../dist/app.mjs';
@@ -27,7 +32,7 @@ test('ordinary site works without credentials and does not expose configuration'
     const response=await app.get(path);assert.equal(response.status,200);assert.ok((await response.text()).length>100);
     assert.equal(response.headers.get('x-content-type-options'),'nosniff');
   }
-  for(const path of ['/.env','/server.mjs','/package.json','/%2e%2e/server.mjs','/dist/../.env'])assert.equal((await app.get(path)).status,404);
+  for(const path of ['/.env','/.env.connection.json','/server.mjs','/package.json','/%2e%2e/server.mjs','/dist/../.env'])assert.equal((await app.get(path)).status,404);
   const unavailable=await app.post();assert.equal(unavailable.status,503);assert.match((await unavailable.json()).error,/пока не подключён/);
 });
 
@@ -39,6 +44,7 @@ test('model request uses server credentials, validated settings and the displaye
   assert.equal(received.url,'https://example.invalid/v1/chat/completions');
   assert.equal(received.init.headers.Authorization,'Bearer '+settings.LLM_API_KEY);
   const body=JSON.parse(received.init.body);assert.equal(body.model,'test-model');assert.match(body.messages[1].content,/Комплексные числа/);
+  assert.equal(body.stream,false);assert.equal(received.init.redirect,'error');
   assert.ok(!JSON.stringify(await(await app.get('/api/status')).json()).includes(settings.LLM_API_KEY));
 });
 
@@ -56,11 +62,97 @@ test('invalid inputs, content types and cross-origin requests do not call the pr
 });
 
 test('provider failures are useful and never leak credentials or provider response bodies',async t=>{
-  for(const code of [401,403,429,500])await t.test(String(code),async t=>{
+  for(const code of [401,402,403,404,429,500])await t.test(String(code),async t=>{
     const app=await running(t,{settings,fetchModel:async()=>new Response('provider secret '+settings.LLM_API_KEY,{status:code})});
     const response=await app.post();assert.equal(response.status,code===429?429:502);
     const text=await response.text();assert.ok(!text.includes(settings.LLM_API_KEY));assert.match(text,/error/);
   });
+});
+
+test('ShareLLM defaults use the verified model and only require the server key',async t=>{
+  let received;
+  const app=await running(t,{settings:{LLM_API_KEY:'test-only-not-a-real-key'},fetchModel:async(url,init)=>{received={url,init};return answer();}});
+  assert.deepEqual(await(await app.get('/api/status')).json(),{aiAvailable:true});
+  assert.equal((await app.post()).status,200);
+  assert.equal(received.url,'https://sharellm.net/v1/chat/completions');
+  assert.equal(JSON.parse(received.init.body).model,'agnes-2.5-flash');
+  const custom=await running(t,{settings:{LLM_API_KEY:'test-only',LLM_BASE_URL:'https://example.invalid/v1'}});
+  assert.deepEqual(await(await custom.get('/api/status')).json(),{aiAvailable:false});
+});
+
+test('imported New API connection works with a root URL and overrides incorrect environment fields',async t=>{
+  const folder=await mkdtemp(join(tmpdir(),'praktikum-connection-'));
+  t.after(()=>rm(folder,{recursive:true,force:true}));
+  const path=join(folder,'.env.connection.json');
+  const imported={_type:'newapi_channel_conn',url:'https://sharellm.net/',key:'local-test-key'};
+  await writeFile(path,JSON.stringify(imported));
+  const loaded=await loadProviderSettings({...settings,LLM_BASE_URL:'incorrect-value',HOST:'127.0.0.1'},path);
+  let received;
+  const app=await running(t,{settings:loaded,fetchModel:async(url,init)=>{received={url,init};return answer();}});
+  assert.equal((await app.post()).status,200);
+  assert.equal(received.url,'https://sharellm.net/v1/chat/completions');
+  assert.equal(received.init.headers.Authorization,'Bearer '+imported.key);
+  assert.equal(JSON.parse(received.init.body).model,'agnes-2.5-flash');
+  assert.equal(loaded.HOST,'127.0.0.1');
+  assert.deepEqual(await loadProviderSettings(settings,join(folder,'missing.json')),settings);
+  assert.equal((await app.get('/.env.connection.json')).status,404);
+});
+
+test('invalid imported connections fail without exposing their contents',async t=>{
+  const folder=await mkdtemp(join(tmpdir(),'praktikum-connection-'));
+  t.after(()=>rm(folder,{recursive:true,force:true}));
+  const path=join(folder,'.env.connection.json');
+  const connection={_type:'newapi_channel_conn',url:'https://sharellm.net',key:'private-test-value'};
+  for(const data of ['malformed '+connection.key,JSON.stringify({...connection,url:'http://sharellm.net'}),JSON.stringify({...connection,url:'https://user:password@sharellm.net'}),JSON.stringify({...connection,model:3}),JSON.stringify({...connection,key:''})]) {
+    await writeFile(path,data);
+    await assert.rejects(()=>loadProviderSettings(settings,path),error=>error.message.includes('.env.connection.json')&&!error.message.includes(connection.key)&&!error.message.includes('password'));
+  }
+});
+
+test('ShareLLM router and model configuration errors are explicit and redact provider messages',async t=>{
+  for(const [code,status,expected] of [['auto_router_disabled',503,/Auto Model Router/],['model_not_supported',502,/модель недоступна/],['model_not_found',502,/модель недоступна/]]) {
+    const app=await running(t,{settings,fetchModel:async()=>new Response(JSON.stringify({error:{code,message:'private '+settings.LLM_API_KEY}}),{status:code==='auto_router_disabled'?503:400})});
+    const response=await app.post();assert.equal(response.status,status);
+    const text=await response.text();assert.match(text,expected);assert.ok(!text.includes(settings.LLM_API_KEY));
+  }
+  const unavailable=await running(t,{settings,fetchModel:async()=>new Response(JSON.stringify({error:{code:'503',message:'private '+settings.LLM_API_KEY}}),{status:503})});
+  const response=await unavailable.post();assert.equal(response.status,503);assert.match((await response.json()).error,/временно недоступен/);
+});
+
+test('compatible gateway JSON fences are accepted, but truncated output is rejected',async t=>{
+  const content='```json\n'+JSON.stringify(result)+'\n```';
+  const app=await running(t,{settings,fetchModel:async()=>new Response(JSON.stringify({choices:[{message:{content},finish_reason:'stop'}]}))});
+  assert.deepEqual(await(await app.post()).json(),{result});
+  const truncated=await running(t,{settings,fetchModel:async()=>new Response(JSON.stringify({choices:[{message:{content:JSON.stringify(result)},finish_reason:'length'}]}))});
+  assert.equal((await truncated.post()).status,502);
+  const failed=await running(t,{settings,fetchModel:async()=>{throw new TypeError('private upstream connection detail');}});
+  const response=await failed.post();assert.equal(response.status,502);
+  assert.ok(!(await response.text()).includes('private upstream'));
+});
+
+test('runtime proxy settings are honored by fetch without contacting an external host',async t=>{
+  if(typeof http.setGlobalProxyFromEnv!=='function'){t.skip('Native runtime proxy support requires Node.js 24.5+');return;}
+  let destination;
+  const proxy=http.createServer((req,res)=>{destination=req.url;res.writeHead(200,{'Content-Type':'application/json'});res.end('{"proxied":true}');});
+  const tunnels=new Set();
+  proxy.on('connect',(req,socket,head)=>{
+    destination=req.url;tunnels.add(socket);socket.on('close',()=>tunnels.delete(socket));
+    socket.write('HTTP/1.1 200 Connection Established\r\n\r\n');
+    const reply=()=>{const body='{"proxied":true}';socket.end('HTTP/1.1 200 OK\r\nContent-Type: application/json\r\nContent-Length: '+Buffer.byteLength(body)+'\r\nConnection: close\r\n\r\n'+body);};
+    if(head.length)reply();else socket.once('data',reply);
+  });
+  proxy.listen(0,'127.0.0.1');await once(proxy,'listening');
+  t.after(()=>new Promise(resolve=>{for(const socket of tunnels)socket.destroy();proxy.close(resolve);proxy.closeAllConnections();}));
+  const proxyUrl='http://127.0.0.1:'+proxy.address().port;
+  const source=`import {configureRuntimeProxy} from ${JSON.stringify(new URL('../server.mjs',import.meta.url).href)};
+    configureRuntimeProxy({HTTP_PROXY:${JSON.stringify(proxyUrl)},HTTPS_PROXY:${JSON.stringify(proxyUrl)},NO_PROXY:''});
+    const response=await fetch('http://proxy-check.invalid/test');
+    console.log(JSON.stringify(await response.json()));`;
+  const child=spawn(process.execPath,['--input-type=module','-e',source],{stdio:['ignore','pipe','pipe'],timeout:10000});
+  let stdout='',stderr='';child.stdout.on('data',chunk=>stdout+=chunk);child.stderr.on('data',chunk=>stderr+=chunk);
+  const [code]=await once(child,'close');assert.equal(code,0,stderr);
+  assert.deepEqual(JSON.parse(stdout),{proxied:true});
+  assert.ok(['http://proxy-check.invalid/test','proxy-check.invalid:80'].includes(destination));
 });
 
 test('invalid or excessively large model output leaves no accepted variant',async t=>{

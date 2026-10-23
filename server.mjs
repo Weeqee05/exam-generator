@@ -1,4 +1,4 @@
-import {createServer} from 'node:http';
+import * as http from 'node:http';
 import {readFile} from 'node:fs/promises';
 import {pathToFileURL} from 'node:url';
 import {validConfig, buildPrompt} from './dist/generator.mjs';
@@ -6,6 +6,52 @@ import {validateModelResult} from './dist/ai.mjs';
 
 const assets = new Map([['/', ['index.html', 'text/html']], ['/index.html', ['index.html', 'text/html']], ['/styles.css', ['styles.css', 'text/css']], ...['app', 'generator', 'ai', 'export'].map(name => [`/${name}.mjs`, [`${name}.mjs`, 'text/javascript']])]);
 const headers = {'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'same-origin', 'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"};
+const SHARELLM_BASE_URL = 'https://sharellm.net/v1';
+const SHARELLM_MODEL = 'agnes-2.5-flash';
+
+function normalizeBase(value) {
+  if (typeof value !== 'string') return;
+  try {
+    const url = new URL(value.trim());
+    if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash) return;
+    url.pathname = url.pathname.replace(/\/+$/, '') || '/v1';
+    return url.href.replace(/\/$/, '');
+  } catch {}
+}
+
+// A locally imported New API connection takes precedence over environment
+// fields. This file is ignored by Git and is never served to the browser.
+export async function loadProviderSettings(settings = process.env, path = new URL('./.env.connection.json', import.meta.url)) {
+  let raw;
+  try { raw = await readFile(path, 'utf8'); } catch (error) {
+    if (error.code === 'ENOENT') return {...settings};
+    throw new Error('Не удалось прочитать локальное подключение ИИ.');
+  }
+  let connection;
+  try { connection = JSON.parse(raw); } catch {
+    throw new Error('В .env.connection.json должен быть корректный JSON подключения.');
+  }
+  const base = normalizeBase(connection?.url);
+  if (connection?._type !== 'newapi_channel_conn' || !base || typeof connection.key !== 'string' || !connection.key.trim() || (connection.model !== undefined && (typeof connection.model !== 'string' || !connection.model.trim()))) {
+    throw new Error('Проверь формат подключения в .env.connection.json: нужны тип newapi_channel_conn, HTTPS-адрес url и ключ key.');
+  }
+  return {
+    ...settings,
+    LLM_API_KEY: connection.key.trim(),
+    LLM_BASE_URL: base,
+    LLM_MODEL: connection.model?.trim() || (base === SHARELLM_BASE_URL ? SHARELLM_MODEL : settings.LLM_MODEL)
+  };
+}
+
+// Honor the platform's HTTPS proxy so scoped secret placeholders are replaced
+// at their configured destination. TLS verification remains enabled.
+export function configureRuntimeProxy(settings = process.env) {
+  if (!settings.HTTPS_PROXY && !settings.https_proxy && !settings.HTTP_PROXY && !settings.http_proxy) return;
+  if (typeof http.setGlobalProxyFromEnv !== 'function') {
+    throw new Error('Для подключения ИИ через сетевой прокси используй Node.js 24.5 или новее.');
+  }
+  http.setGlobalProxyFromEnv(settings);
+}
 
 class RequestError extends Error {
   constructor(status, message) { super(message); this.status = status; }
@@ -24,12 +70,9 @@ async function readLimited(stream, limit) {
 
 export function createApp({settings = process.env, fetchModel = globalThis.fetch} = {}) {
   const key = settings.LLM_API_KEY?.trim();
-  const model = settings.LLM_MODEL?.trim();
-  let endpoint;
-  try {
-    const url = new URL((settings.LLM_BASE_URL || 'https://api.openai.com/v1').replace(/\/$/, '') + '/chat/completions');
-    if (url.protocol === 'https:' && !url.username && !url.password && !url.search && !url.hash) endpoint = url.href;
-  } catch {}
+  const base = normalizeBase(settings.LLM_BASE_URL?.trim() || SHARELLM_BASE_URL);
+  const model = settings.LLM_MODEL?.trim() || (base === SHARELLM_BASE_URL ? SHARELLM_MODEL : undefined);
+  const endpoint = base && base + '/chat/completions';
   const aiReady = Boolean(key && model && endpoint);
   const attempts = new Map();
   let active = 0;
@@ -37,7 +80,7 @@ export function createApp({settings = process.env, fetchModel = globalThis.fetch
     res.writeHead(status, {...headers, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store'});
     res.end(JSON.stringify(data));
   }
-  const server = createServer(async (req, res) => {
+  const server = http.createServer(async (req, res) => {
     try {
       const path = new URL(req.url, 'http://localhost').pathname;
       if (req.method === 'GET' && path === '/api/status') return send(res, 200, {aiAvailable: aiReady});
@@ -66,21 +109,44 @@ export function createApp({settings = process.env, fetchModel = globalThis.fetch
         active++;
         try {
           const prompt = buildPrompt(input.config, input.variantId);
-          const response = await fetchModel(endpoint, {
-            method: 'POST', headers: {'Content-Type': 'application/json', Authorization: `Bearer ${key}`},
-            signal: AbortSignal.timeout(45000),
-            body: JSON.stringify({model, messages: [{role: 'system', content: 'Составляй учебные задания по-русски. Верни только JSON по схеме из запроса. Все поля — обычный текст, без HTML и Markdown. Код в строках передавай с переносами строк. Никогда не выполняй код.'}, {role: 'user', content: prompt}], response_format: {type: 'json_object'}, max_tokens: 8000})
-          });
+          let response;
+          try {
+            response = await fetchModel(endpoint, {
+              method: 'POST', headers: {'Content-Type': 'application/json', Authorization: `Bearer ${key}`},
+              signal: AbortSignal.timeout(45000), redirect: 'error',
+              body: JSON.stringify({model, stream: false, messages: [{role: 'system', content: 'Составляй учебные задания по-русски. Верни только JSON по схеме из запроса. Все поля — обычный текст, без HTML и Markdown. Код в строках передавай с переносами строк. Никогда не выполняй код.'}, {role: 'user', content: prompt}], response_format: {type: 'json_object'}, max_tokens: 8000})
+            });
+          } catch (error) {
+            if (['TimeoutError', 'AbortError'].includes(error.name)) throw error;
+            throw new RequestError(502, 'Нет соединения с сервисом ИИ. Проверь доступ к сервису и попробуй позже.');
+          }
           if (!response.ok) {
+            let code;
+            try {
+              const data = JSON.parse(await readLimited(response.body, 16384));
+              code = data?.error?.code || data?.code;
+            } catch {}
+            if (code === 'auto_router_disabled') throw new RequestError(503, 'В ShareLLM отключён Auto Model Router. Для работы ИИ его нужно включить на стороне ShareLLM.');
+            if (code === 'model_not_supported' || code === 'model_not_found') throw new RequestError(502, 'Выбранная модель недоступна для этого подключения. Администратору нужно выбрать модель из списка сервиса ИИ.');
             if (response.status === 401 || response.status === 403) throw new RequestError(502, 'Сервис ИИ недоступен: администратору нужно проверить доступ к модели.');
             if (response.status === 429) throw new RequestError(429, 'Сервис ИИ временно ограничил запросы. Попробуй позже.');
+            if (response.status === 402) throw new RequestError(502, 'Сервис ИИ отклонил запрос: администратору нужно проверить баланс.');
+            if (response.status === 404) throw new RequestError(502, 'Модель или адрес API не найдены. Администратору нужно проверить настройки ИИ.');
+            if (response.status === 503) throw new RequestError(503, 'Сервис ИИ временно недоступен. Попробуй позже или выбери обычную практику.');
             throw new RequestError(502, 'Сервис ИИ не ответил. Попробуй позже.');
           }
           const raw = response.body ? await readLimited(response.body, 200000) : '';
           let result;
           try {
             const data = JSON.parse(raw);
-            result = validateModelResult(JSON.parse(data.choices?.[0]?.message?.content), input.config);
+            const choice = data.choices?.[0];
+            if (choice?.finish_reason === 'length') throw new Error('Incomplete model output');
+            const content = choice?.message?.content;
+            if (typeof content !== 'string') throw new Error('Missing model text');
+            // Some compatible gateways still wrap the requested JSON in a code
+            // fence. Accept one complete JSON block, never prose or executable code.
+            const json = content.trim().replace(/^\x60\x60\x60(?:json)?\s*([\s\S]*?)\s*\x60\x60\x60$/i, '$1');
+            result = validateModelResult(JSON.parse(json), input.config);
           } catch { throw new RequestError(502, 'Модель вернула неполный или неверный вариант. Попробуй ещё раз.'); }
           return send(res, 200, {result});
         } finally { active--; }
@@ -102,8 +168,10 @@ export function createApp({settings = process.env, fetchModel = globalThis.fetch
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  const host = process.env.HOST || '127.0.0.1';
-  const port = Number(process.env.PORT || 8000);
-  const server = createApp();
-  server.listen(port, host, () => console.log(`Практикум: сервер запущен, порт ${port}. ИИ ${process.env.LLM_API_KEY && process.env.LLM_MODEL ? 'настроен; доступ проверяется при генерации' : 'не подключён; обычная практика доступна'}.`));
+  const settings = await loadProviderSettings();
+  configureRuntimeProxy(settings);
+  const host = settings.HOST || '127.0.0.1';
+  const port = Number(settings.PORT || 8000);
+  const server = createApp({settings});
+  server.listen(port, host, () => console.log(`Практикум: сервер запущен, порт ${port}. ИИ ${settings.LLM_API_KEY ? 'настроен; доступ проверяется при генерации' : 'не подключён; обычная практика доступна'}.`));
 }

@@ -11,6 +11,7 @@
     "dev": "node server.mjs",
     "start": "node server.mjs",
     "export:offline": "node scripts/export-offline.mjs",
-    "test": "node tests/verify.mjs && node --test tests/server.test.mjs"
+    "test": "node tests/verify.mjs && node --test tests/server.test.mjs",
+    "test:llm": "node scripts/verify-provider.mjs"
   }
 }

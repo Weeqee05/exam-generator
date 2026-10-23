@@ -21,7 +21,7 @@ export function readSaved(storage) {
 
 export function mountApp(doc,storage,env={}) {
   const $=id=>doc.getElementById(id),state=readSaved(storage);
-  let current=null,tasks=[],toastTimer,activeTab='tasks',memoryWarning=false,busy=false,aiAvailable=false;
+  let current=null,tasks=[],toastTimer,activeTab='tasks',memoryWarning=false,busy=false,aiAvailable=false,sourceChosen=false;
   const request=env.fetch||globalThis.fetch?.bind(globalThis);
   const randomSeed=env.randomSeed||(()=>{if(globalThis.crypto?.getRandomValues){const a=new Uint32Array(1);globalThis.crypto.getRandomValues(a);return a[0];}return Math.floor(Math.random()*4294967296);});
   const now=env.now||(()=>new Date().toISOString());
@@ -150,11 +150,14 @@ export function mountApp(doc,storage,env={}) {
       aiAvailable=response.ok&&data.aiAvailable===true;
     } catch {aiAvailable=false;}
     $('ai-option').disabled=!aiAvailable;
-    $('connection-status').textContent=aiAvailable?'Режим ИИ доступен. Можно выбрать способ генерации.':'Обычная практика доступна. ИИ пока не подключён.';
+    if(aiAvailable&&!sourceChosen)$('source').value='ai';
+    if(!aiAvailable&&$('source').value==='ai')$('source').value='local';
+    $('connection-status').textContent=aiAvailable?'Режим ИИ доступен. Нажми «Создать вариант», чтобы получить задания.':'Обычная практика доступна. ИИ пока не подключён.';
+    updateSettings();
   }
   $('generator-form').addEventListener('submit',e=>{e.preventDefault();return submitGeneration();});
   $('regenerate').addEventListener('click',submitGeneration);
-  $('source').addEventListener('change',updateSettings);
+  $('source').addEventListener('change',()=>{sourceChosen=true;updateSettings();});
   $('history-search').addEventListener('input',renderHistory);
   $('download-variant').addEventListener('click',()=>{
     const text=exportVariant(current,tasks,$('include-answers').checked);

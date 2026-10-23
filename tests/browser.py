@@ -14,6 +14,14 @@ with sync_playwright() as playwright:
         headless=True, args=['--no-sandbox'])
     context = browser.new_context(viewport={'width': 1440, 'height': 1000}, accept_downloads=True)
     page = context.new_page()
+    # Ordinary UI checks must never spend requests if the development server
+    # already has a real provider key configured.
+    page.route('**/api/status', lambda route: route.fulfill(json={'aiAvailable': False}))
+    unexpected_model_requests = []
+    def block_model_request(route):
+        unexpected_model_requests.append(route.request.url)
+        route.abort()
+    page.route('**/api/generate', block_model_request)
     errors = []
     page.on('pageerror', lambda error: errors.append(str(error)))
     page.goto(BASE)
@@ -96,6 +104,7 @@ with sync_playwright() as playwright:
     page.set_viewport_size({'width': 390, 'height': 844})
     page.screenshot(path=str(ARTIFACTS / 'mobile.png'), full_page=True)
     assert not errors, errors
+    assert not unexpected_model_requests, unexpected_model_requests
     print('PASS browser: 320–1440 px, screenshots, no JavaScript errors')
 
     # Real frontend state transitions with an explicitly simulated model service.
@@ -107,6 +116,8 @@ with sync_playwright() as playwright:
     ai_page.route('**/api/generate', lambda route: pending.append(route))
     ai_page.goto(BASE)
     expect(ai_page.locator('#ai-option')).to_be_enabled()
+    expect(ai_page.locator('#source')).to_have_value('ai')
+    assert not pending, 'Opening the page must not spend a paid model request'
     ai_page.select_option('#source', 'ai')
     ai_page.fill('#count', '1')
     ai_page.click('#generate-button')
