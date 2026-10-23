@@ -45,7 +45,7 @@ export function mountApp(doc,storage,env={}) {
     $('increase').disabled=busy||c.count>=10;
     const selectedSource=$('source').value==='ai'?'ai':'local';
     $('settings-notice').hidden=!current||(JSON.stringify(c)===JSON.stringify(current.config)&&selectedSource===(current.source||'local'));
-    $('source-description').textContent=$('source').value==='ai'?'Новые задания от языковой модели. На генерацию может понадобиться до минуты.':'Проверенные шаблоны со случайными числами. Работает без подключения ИИ.';
+    $('source-description').textContent=$('source').value==='ai'?'Новые задания от языковой модели. На генерацию может понадобиться до четырёх минут.':'Проверенные шаблоны со случайными числами. Работает без подключения ИИ.';
   }
   function updateProgress() {
     const n=current.solved.filter(Boolean).length;
@@ -128,7 +128,7 @@ export function mountApp(doc,storage,env={}) {
     if(!aiAvailable){toast('ИИ пока не подключён. Выбери обычную практику.');return false;}
     $('generation-error').hidden=true;setBusy(true);announce('Создаём задания. Подожди немного.');
     try {
-      const response=await request('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({config,variantId:state.sequence+1}),signal:AbortSignal.timeout(55000)});
+      const response=await request('/api/generate',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({config,variantId:state.sequence+1}),signal:AbortSignal.timeout(250000)});
       const data=await response.json();
       if(!response.ok)throw new Error(data.error||'Не удалось создать вариант. Попробуй ещё раз.');
       const result=validateModelResult(data.result,config);

@@ -7,7 +7,7 @@ import {validateModelResult} from './dist/ai.mjs';
 const assets = new Map([['/', ['index.html', 'text/html']], ['/index.html', ['index.html', 'text/html']], ['/styles.css', ['styles.css', 'text/css']], ...['app', 'generator', 'ai', 'export'].map(name => [`/${name}.mjs`, [`${name}.mjs`, 'text/javascript']])]);
 const headers = {'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'same-origin', 'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"};
 const SHARELLM_BASE_URL = 'https://sharellm.net/v1';
-const SHARELLM_MODEL = 'agnes-2.5-flash';
+const SHARELLM_MODEL = 'qwen3.8-flash';
 
 function normalizeBase(value) {
   if (typeof value !== 'string') return;
@@ -68,11 +68,85 @@ async function readLimited(stream, limit) {
   return Buffer.concat(chunks).toString('utf8');
 }
 
+// Qwen sends reasoning and final-answer deltas in separate SSE fields. Only
+// final text reaches the existing JSON validator and the browser.
+async function readStreamedChoice(stream) {
+  const invalid = () => new RequestError(502, 'Модель вернула неполный или неверный вариант. Попробуй ещё раз.');
+  if (!stream) throw invalid();
+  const decoder = new TextDecoder('utf-8', {fatal: true});
+  const parts = [];
+  let rawBytes = 0, contentBytes = 0, line = '', dataLines = [], eventType = '', skipLF = false, done = false, finishReason;
+  function dispatch() {
+    if (eventType === 'error') throw invalid();
+    eventType = '';
+    if (!dataLines.length) return;
+    const payload = dataLines.join('\n');
+    dataLines = [];
+    if (payload.trim() === '[DONE]') { done = true; return; }
+    let data;
+    try { data = JSON.parse(payload); } catch { throw invalid(); }
+    if (!data || typeof data !== 'object' || Array.isArray(data) || Object.hasOwn(data, 'error') || !Array.isArray(data.choices)) throw invalid();
+    if (!data.choices.length) return; // Usage-only events can have an empty choices array.
+    const choice = data.choices[0];
+    if (!choice || typeof choice !== 'object' || Array.isArray(choice) || (choice.delta != null && (typeof choice.delta !== 'object' || Array.isArray(choice.delta)))) throw invalid();
+    if (choice.finish_reason === 'length') throw invalid();
+    if (choice.finish_reason != null) {
+      if (typeof choice.finish_reason !== 'string') throw invalid();
+      finishReason = choice.finish_reason;
+    }
+    const fragment = choice.delta?.content;
+    if (fragment == null || fragment === '') return;
+    if (typeof fragment !== 'string') throw invalid();
+    contentBytes += Buffer.byteLength(fragment, 'utf8');
+    const previous = parts.at(-1);
+    // Count a surrogate pair split between JSON deltas as one UTF-8 character.
+    if (previous && /[\uD800-\uDBFF]$/.test(previous) && /^[\uDC00-\uDFFF]/.test(fragment)) contentBytes -= 2;
+    if (contentBytes > 200000) throw new RequestError(413, 'Слишком большой запрос или ответ модели.');
+    parts.push(fragment);
+  }
+  function acceptLine() {
+    if (!line) dispatch();
+    else if (!line.startsWith(':')) {
+      const colon = line.indexOf(':');
+      const field = colon < 0 ? line : line.slice(0, colon);
+      let value = colon < 0 ? '' : line.slice(colon + 1);
+      if (value.startsWith(' ')) value = value.slice(1);
+      if (field === 'data') dataLines.push(value);
+      else if (field === 'event') eventType = value;
+    }
+    line = '';
+  }
+  function feed(text) {
+    for (const character of text) {
+      if (done) return;
+      if (skipLF) { skipLF = false; if (character === '\n') continue; }
+      if (character === '\r' || character === '\n') { acceptLine(); skipLF = character === '\r'; }
+      else line += character;
+    }
+  }
+  try {
+    for await (const chunk of stream) {
+      rawBytes += chunk.byteLength;
+      if (rawBytes > 2 * 1024 * 1024) throw new RequestError(413, 'Слишком большой запрос или ответ модели.');
+      feed(decoder.decode(chunk, {stream: true}));
+      if (done) break;
+    }
+    if (!done) feed(decoder.decode());
+  } catch (error) {
+    if (error instanceof RequestError || ['TimeoutError', 'AbortError'].includes(error.name)) throw error;
+    throw invalid();
+  }
+  const content = parts.join('');
+  if (!done || !content.trim()) throw invalid();
+  return {message: {content}, finish_reason: finishReason};
+}
+
 export function createApp({settings = process.env, fetchModel = globalThis.fetch} = {}) {
   const key = settings.LLM_API_KEY?.trim();
   const base = normalizeBase(settings.LLM_BASE_URL?.trim() || SHARELLM_BASE_URL);
   const model = settings.LLM_MODEL?.trim() || (base === SHARELLM_BASE_URL ? SHARELLM_MODEL : undefined);
   const endpoint = base && base + '/chat/completions';
+  const streamModel = base === SHARELLM_BASE_URL && model === 'qwen3.8-flash';
   const aiReady = Boolean(key && model && endpoint);
   const attempts = new Map();
   let active = 0;
@@ -113,8 +187,8 @@ export function createApp({settings = process.env, fetchModel = globalThis.fetch
           try {
             response = await fetchModel(endpoint, {
               method: 'POST', headers: {'Content-Type': 'application/json', Authorization: `Bearer ${key}`},
-              signal: AbortSignal.timeout(45000), redirect: 'error',
-              body: JSON.stringify({model, stream: false, messages: [{role: 'system', content: 'Составляй учебные задания по-русски. Верни только JSON по схеме из запроса. Все поля — обычный текст, без HTML и Markdown. Код в строках передавай с переносами строк. Никогда не выполняй код.'}, {role: 'user', content: prompt}], response_format: {type: 'json_object'}, max_tokens: 8000})
+              signal: AbortSignal.timeout(240000), redirect: 'error',
+              body: JSON.stringify({model, stream: streamModel, messages: [{role: 'system', content: 'Составляй учебные задания по-русски. Верни только JSON по схеме из запроса. Все поля — обычный текст, без HTML и Markdown. Код в строках передавай с переносами строк. Никогда не выполняй код.'}, {role: 'user', content: prompt}], response_format: {type: 'json_object'}, max_tokens: 8000})
             });
           } catch (error) {
             if (['TimeoutError', 'AbortError'].includes(error.name)) throw error;
@@ -135,11 +209,17 @@ export function createApp({settings = process.env, fetchModel = globalThis.fetch
             if (response.status === 503) throw new RequestError(503, 'Сервис ИИ временно недоступен. Попробуй позже или выбери обычную практику.');
             throw new RequestError(502, 'Сервис ИИ не ответил. Попробуй позже.');
           }
-          const raw = response.body ? await readLimited(response.body, 200000) : '';
+          const streaming = response.headers.get('content-type')?.toLowerCase().startsWith('text/event-stream');
+          let choice;
+          if (streaming) choice = await readStreamedChoice(response.body);
+          else {
+            const raw = response.body ? await readLimited(response.body, 200000) : '';
+            try { choice = JSON.parse(raw).choices?.[0]; } catch {
+              throw new RequestError(502, 'Модель вернула неполный или неверный вариант. Попробуй ещё раз.');
+            }
+          }
           let result;
           try {
-            const data = JSON.parse(raw);
-            const choice = data.choices?.[0];
             if (choice?.finish_reason === 'length') throw new Error('Incomplete model output');
             const content = choice?.message?.content;
             if (typeof content !== 'string') throw new Error('Missing model text');

@@ -19,7 +19,7 @@ if (!settings.LLM_API_KEY?.trim()) {
     const result = await new Promise((resolve, reject) => {
       // Local application request; the provider request inside createApp uses
       // the configured HTTPS proxy and retains certificate verification.
-      const req = request({host: '127.0.0.1', port: server.address().port, path: '/api/generate', method: 'POST', agent: false, headers: {'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(input)}, timeout: 60000}, res => {
+      const req = request({host: '127.0.0.1', port: server.address().port, path: '/api/generate', method: 'POST', agent: false, headers: {'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(input)}, timeout: 260000}, res => {
         let text = '';
         res.setEncoding('utf8');
         res.on('data', chunk => {text += chunk; if (text.length > 200000) res.destroy(new Error('Слишком большой ответ приложения.'));});

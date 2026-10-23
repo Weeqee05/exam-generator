@@ -16,6 +16,16 @@ const config={topic:'complex',level:'easy',count:1};
 const result={topic:'complex',difficulty:'easy',tasks:[{type:'Сложение',question:'Найди 1 + i + 2 + i.',hint:'Сложи действительные части.',answer:'3 + 2i',explanation:'1 + 2 = 3, i + i = 2i.'}]};
 const settings={LLM_API_KEY:'test-only-not-a-real-key',LLM_MODEL:'test-model',LLM_BASE_URL:'https://example.invalid/v1'};
 const answer=(data=result)=>new Response(JSON.stringify({choices:[{message:{content:JSON.stringify(data)}}]}),{headers:{'Content-Type':'application/json'}});
+const qwenSettings={LLM_API_KEY:'test-only-not-a-real-key'};
+const event=(data,ending='\n')=>'data: '+JSON.stringify(data)+ending+ending;
+const textEvent=(content,finish_reason=null)=>event({choices:[{delta:{content},finish_reason}]});
+function streamed(chunks) {
+  let index=0;
+  return new Response(new ReadableStream({pull(controller){
+    if(index===chunks.length)controller.close();
+    else {const chunk=chunks[index++];controller.enqueue(typeof chunk==='string'?Buffer.from(chunk):chunk);}
+  }}),{headers:{'Content-Type':'text/event-stream; charset=utf-8'}});
+}
 
 async function running(t, options={}) {
   const server=createApp({settings:{},...options});
@@ -75,9 +85,82 @@ test('ShareLLM defaults use the verified model and only require the server key',
   assert.deepEqual(await(await app.get('/api/status')).json(),{aiAvailable:true});
   assert.equal((await app.post()).status,200);
   assert.equal(received.url,'https://sharellm.net/v1/chat/completions');
-  assert.equal(JSON.parse(received.init.body).model,'agnes-2.5-flash');
+  assert.equal(JSON.parse(received.init.body).model,'qwen3.8-flash');
+  assert.equal(JSON.parse(received.init.body).stream,true); // Compatible gateways may still return ordinary JSON.
   const custom=await running(t,{settings:{LLM_API_KEY:'test-only',LLM_BASE_URL:'https://example.invalid/v1'}});
   assert.deepEqual(await(await custom.get('/api/status')).json(),{aiAvailable:false});
+});
+
+test('streaming is requested only for the selected Qwen endpoint',async t=>{
+  for(const other of [{...settings,LLM_MODEL:'qwen3.8-flash'},{...settings,LLM_BASE_URL:'https://sharellm.net/v1'}]) {
+    let body;
+    const app=await running(t,{settings:other,fetchModel:async(_url,init)=>{body=JSON.parse(init.body);return answer();}});
+    assert.equal((await app.post()).status,200);
+    assert.equal(body.stream,false);
+  }
+});
+
+test('Qwen SSE handles split UTF-8, CRLF and multiline data while excluding reasoning',async t=>{
+  const unicodeResult={...result,tasks:[{...result.tasks[0],question:'Вычисли сумму 1 + i + 2 + i. 🧮'}]};
+  const content=JSON.stringify(unicodeResult);
+  const boundary=content.indexOf('🧮')+1;
+  const first=JSON.stringify({choices:[{delta:{content:content.slice(0,boundary)}}]},null,2).split('\n').map(line=>'data: '+line).join('\r\n')+'\r\n\r\n';
+  const privateReasoning='private reasoning '+qwenSettings.LLM_API_KEY;
+  const wire=': keepalive\r\n\r\n'
+    +'event: message\r\n'+event({choices:[{delta:{role:'assistant',reasoning_content:privateReasoning}}]},'\r\n')
+    +first
+    +'id: ignored\r'+event({choices:[{delta:{content:content.slice(boundary)}}]},'\r')
+    +event({choices:[],usage:{total_tokens:100}})
+    +textEvent('', 'stop')
+    +'data: [DONE]\r\n\r\n';
+  const bytes=Buffer.from(wire);
+  // One-byte network chunks deliberately split both UTF-8 characters and SSE boundaries.
+  const chunks=Array.from(bytes,byte=>Uint8Array.of(byte));
+  let requested;
+  const app=await running(t,{settings:qwenSettings,fetchModel:async(_url,init)=>{requested=JSON.parse(init.body);return streamed(chunks);}});
+  const response=await app.post();
+  assert.equal(response.status,200);
+  const data=await response.json();assert.deepEqual(data,{result:unicodeResult});
+  assert.equal(requested.stream,true);
+  assert.ok(!JSON.stringify(data).includes(privateReasoning));
+});
+
+test('incomplete, invalid, error and truncated SSE responses cannot become accepted variants',async t=>{
+  const content=JSON.stringify(result);
+  const complete=textEvent(content,'stop');
+  const secret='private '+qwenSettings.LLM_API_KEY;
+  const cases=[
+    [complete],
+    ['data: not-json\n\ndata: [DONE]\n\n'],
+    [event({error:{message:secret}})+'data: [DONE]\n\n'],
+    ['event: error\n'+event({message:secret})+'data: [DONE]\n\n'],
+    [textEvent(content,'length')+'data: [DONE]\n\n'],
+    ['data: [DONE]\n\n'],
+    [complete+'data: [DONE]\n'],
+    [complete+event({choices:[null]})+'data: [DONE]\n\n'],
+    [complete+event({choices:[{delta:'invalid'}]})+'data: [DONE]\n\n'],
+    [Uint8Array.of(0xc3,0x28)]
+  ];
+  for(const chunks of cases) {
+    const app=await running(t,{settings:qwenSettings,fetchModel:async()=>streamed(chunks)});
+    const response=await app.post();assert.equal(response.status,502);
+    assert.ok(!(await response.text()).includes(qwenSettings.LLM_API_KEY));
+  }
+});
+
+test('stream size limits and errors during body reading preserve useful status codes',async t=>{
+  const oversizedRaw=event({choices:[{delta:{reasoning_content:'x'.repeat(2*1024*1024)}}]});
+  const oversizedContent=textEvent('я'.repeat(100001));
+  for(const wire of [oversizedRaw,oversizedContent]) {
+    const app=await running(t,{settings:qwenSettings,fetchModel:async()=>streamed([wire])});
+    const response=await app.post();assert.equal(response.status,413);
+    assert.ok(!(await response.text()).includes(qwenSettings.LLM_API_KEY));
+  }
+  for(const name of ['TimeoutError','AbortError','TypeError']) {
+    const app=await running(t,{settings:qwenSettings,fetchModel:async()=>new Response(new ReadableStream({pull(controller){controller.error(new DOMException('private '+qwenSettings.LLM_API_KEY,name));}}),{headers:{'Content-Type':'text/event-stream'}})});
+    const response=await app.post();assert.equal(response.status,name==='TypeError'?502:504);
+    assert.ok(!(await response.text()).includes(qwenSettings.LLM_API_KEY));
+  }
 });
 
 test('imported New API connection works with a root URL and overrides incorrect environment fields',async t=>{
@@ -92,7 +175,7 @@ test('imported New API connection works with a root URL and overrides incorrect 
   assert.equal((await app.post()).status,200);
   assert.equal(received.url,'https://sharellm.net/v1/chat/completions');
   assert.equal(received.init.headers.Authorization,'Bearer '+imported.key);
-  assert.equal(JSON.parse(received.init.body).model,'agnes-2.5-flash');
+  assert.equal(JSON.parse(received.init.body).model,'qwen3.8-flash');
   assert.equal(loaded.HOST,'127.0.0.1');
   assert.deepEqual(await loadProviderSettings(settings,join(folder,'missing.json')),settings);
   assert.equal((await app.get('/.env.connection.json')).status,404);
