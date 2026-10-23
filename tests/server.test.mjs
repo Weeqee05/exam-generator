@@ -46,6 +46,35 @@ test('ordinary site works without credentials and does not expose configuration'
   const unavailable=await app.post();assert.equal(unavailable.status,503);assert.match((await unavailable.json()).error,/пока не подключён/);
 });
 
+test('embedded preview changes only the framing policy for static and JSON responses',async t=>{
+  const ordinary=await running(t);
+  const normalResponse=await ordinary.get('/');
+  const normalPolicy=normalResponse.headers.get('content-security-policy');
+  assert.match(normalPolicy,/frame-ancestors 'none'/);
+  const directives=policy=>policy.split(';').map(value=>value.trim()).filter(Boolean);
+  const expected=directives(normalPolicy).filter(value=>!value.startsWith('frame-ancestors '));
+  const preview=await running(t,{settings:{EMBEDDED_PREVIEW:'1'}});
+  for(const path of ['/','/api/status','/missing']) {
+    const response=await preview.get(path);
+    const policy=response.headers.get('content-security-policy');
+    assert.ok(!policy.includes('frame-ancestors'));
+    assert.deepEqual(directives(policy),expected);
+    for(const name of ['x-content-type-options','referrer-policy'])assert.equal(response.headers.get(name),normalResponse.headers.get(name));
+  }
+  const crossOrigin=await preview.post({config,variantId:1},{Origin:'https://evil.invalid'});
+  assert.equal(crossOrigin.status,403);
+  assert.deepEqual(directives(crossOrigin.headers.get('content-security-policy')),expected);
+  // Opting in one instance must not mutate the default policy used by another.
+  assert.equal((await ordinary.get('/api/status')).headers.get('content-security-policy'),normalPolicy);
+});
+
+test('embedded preview requires the explicit string flag',async t=>{
+  for(const value of [undefined,'0',false,true,1,'true']) {
+    const app=await running(t,{settings:{EMBEDDED_PREVIEW:value}});
+    for(const path of ['/','/api/status'])assert.match((await app.get(path)).headers.get('content-security-policy'),/frame-ancestors 'none'/);
+  }
+});
+
 test('model request uses server credentials, validated settings and the displayed prompt',async t=>{
   let received;
   const app=await running(t,{settings,fetchModel:async(url,init)=>{received={url,init};return answer();}});

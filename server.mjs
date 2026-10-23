@@ -142,6 +142,10 @@ async function readStreamedChoice(stream) {
 }
 
 export function createApp({settings = process.env, fetchModel = globalThis.fetch} = {}) {
+  // Embedded development previews opt in without changing the standalone policy.
+  const responseHeaders = settings.EMBEDDED_PREVIEW === '1'
+    ? {...headers, 'Content-Security-Policy': headers['Content-Security-Policy'].replace("frame-ancestors 'none'; ", '')}
+    : headers;
   const key = settings.LLM_API_KEY?.trim();
   const base = normalizeBase(settings.LLM_BASE_URL?.trim() || SHARELLM_BASE_URL);
   const model = settings.LLM_MODEL?.trim() || (base === SHARELLM_BASE_URL ? SHARELLM_MODEL : undefined);
@@ -151,7 +155,7 @@ export function createApp({settings = process.env, fetchModel = globalThis.fetch
   const attempts = new Map();
   let active = 0;
   function send(res, status, data) {
-    res.writeHead(status, {...headers, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store'});
+    res.writeHead(status, {...responseHeaders, 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store'});
     res.end(JSON.stringify(data));
   }
   const server = http.createServer(async (req, res) => {
@@ -235,7 +239,7 @@ export function createApp({settings = process.env, fetchModel = globalThis.fetch
       const asset = assets.get(path);
       if (!asset) throw new RequestError(404, 'Страница не найдена.');
       const body = await readFile(new URL('./dist/' + asset[0], import.meta.url));
-      res.writeHead(200, {...headers, 'Content-Type': asset[1] + '; charset=utf-8', 'Cache-Control': 'no-cache', 'Content-Length': body.length});
+      res.writeHead(200, {...responseHeaders, 'Content-Type': asset[1] + '; charset=utf-8', 'Cache-Control': 'no-cache', 'Content-Length': body.length});
       res.end(req.method === 'HEAD' ? undefined : body);
     } catch (error) {
       if (res.destroyed || res.writableEnded) return;
