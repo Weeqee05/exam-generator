@@ -57,8 +57,11 @@ export function safeFeedback(task, feedback, studentAnswer) {
     result.error ||= 'Проверь последний переход: он должен соответствовать условию и выполненным вычислениям.';
     result.hint ||= safeHint(task);
   }
-  if (result.verdict === 'clarify' && !/[?？]/u.test(result.explanation)) {
-    result.explanation = result.explanation.slice(0, 1350) + ' Что означает твоя запись и какой итоговый ответ ты получил?';
+  if (result.verdict === 'clarify') {
+    result.error = ''; result.hint = '';
+    if (!/[?？]|(?:уточни|напиши|поясни|укажи|пожалуйста)/iu.test(result.explanation)) {
+      result.explanation = result.explanation.slice(0, 1350) + ' Напиши, пожалуйста, итоговый ответ.';
+    }
   }
   return result;
 }

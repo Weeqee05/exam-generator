@@ -341,3 +341,17 @@ test('download includes the current worksheet and answers only on request',()=>{
   const blank=exportVariant(variant,tasks);assert.match(blank,/ЗАДАНИЕ 1/);assert.ok(!blank.includes('Ответ:'));assert.ok(!/<\/?(?:span|pre|code|sup)>/.test(blank));
   const full=exportVariant(variant,tasks,true);assert.match(full,/Ответ:/);assert.match(full,/Решение:/);
 });
+
+test('local model profiles load independently and reject malformed profiles without exposing keys',async t=>{
+  const folder=await mkdtemp(join(tmpdir(),'model-profiles-'));t.after(()=>rm(folder,{recursive:true,force:true}));
+  const path=join(folder,'.env.connection.json');
+  const connection={_type:'newapi_channel_conn',url:'https://generativelanguage.googleapis.com/v1beta/openai',key:'gemini-profile-key',providers:{qwen:{url:'https://sharellm.net',key:'qwen-profile-key'}}};
+  await writeFile(path,JSON.stringify(connection));const loaded=await loadProviderSettings({},path);
+  assert.equal(loaded.LLM_API_KEY,'gemini-profile-key');assert.equal(loaded.QWEN_API_KEY,'qwen-profile-key');
+  assert.equal(loaded.QWEN_MODEL,'qwen3.8-flash');assert.equal(loaded.QWEN_BASE_URL,'https://sharellm.net/v1');
+  const app=await running(t,{settings:loaded});const response=await app.get('/api/models');
+  const data=await response.json();assert.equal(data.providers.find(p=>p.id==='qwen').available,true);
+  assert.ok(!JSON.stringify(data).includes('profile-key'));
+  connection.providers.qwen.url='http://invalid.example';await writeFile(path,JSON.stringify(connection));
+  await assert.rejects(()=>loadProviderSettings({},path),e=>!e.message.includes('profile-key'));
+});

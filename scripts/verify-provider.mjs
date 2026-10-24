@@ -2,12 +2,15 @@ import {request} from 'node:http';
 import {once} from 'node:events';
 import assert from 'node:assert/strict';
 import {createApp, configureRuntimeProxy, loadProviderSettings} from '../server.mjs';
+import {createModelRegistry} from '../server/provider.mjs';
 
 // Explicit paid integration check. Never run from npm test or on page load.
 // Three model operations: generation, written-answer grading, and tutoring chat.
 const settings = await loadProviderSettings();
-if (!settings.LLM_API_KEY?.trim()) {
-  console.error('ИИ не настроен. Добавь подключение на сервере перед настоящей проверкой.');
+const registry = createModelRegistry(settings);
+const provider = process.argv[2] || registry.defaultProvider;
+if (!registry.get(provider)?.ready) {
+  console.error('Выбранная модель не настроена. Добавь её серверный ключ перед настоящей проверкой.');
   process.exitCode = 1;
 } else {
   configureRuntimeProxy(settings);
@@ -23,7 +26,7 @@ if (!settings.LLM_API_KEY?.trim()) {
   const operations = [];
   async function api(path, data) {
     const started = Date.now();
-    const input = JSON.stringify(data);
+    const input = JSON.stringify({...data,provider});
     const result = await new Promise((resolve, reject) => {
       const req = request({host: '127.0.0.1', port: server.address().port, path, method: 'POST', agent: false,
         headers: {'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(input), ...(cookie ? {Cookie: cookie} : {})}, timeout: 260000}, res => {

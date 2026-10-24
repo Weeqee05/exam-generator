@@ -7,6 +7,36 @@ const SHARELLM_MODEL = 'qwen3.8-flash';
 const DEFAULT_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/openai';
 const DEFAULT_MODEL = 'gemini-3.1-flash-lite';
 
+export const MODEL_PRESETS = {
+  gemini: {label: 'Gemini', base: DEFAULT_BASE_URL, model: DEFAULT_MODEL},
+  qwen: {label: 'Qwen', base: SHARELLM_BASE_URL, model: SHARELLM_MODEL}
+};
+
+// The browser selects only a public id; credentials and destinations stay here.
+export function createModelRegistry(settings, fetchModel) {
+  const base = normalizeBase(settings.LLM_BASE_URL?.trim() || DEFAULT_BASE_URL);
+  const defaultProvider = Object.keys(MODEL_PRESETS).find(id => MODEL_PRESETS[id].base === base) || 'default';
+  const clients = new Map();
+  for (const [id, preset] of Object.entries(MODEL_PRESETS)) {
+    const prefix = id.toUpperCase();
+    const explicitKey = settings[prefix + '_API_KEY']?.trim();
+    const current = id === defaultProvider;
+    clients.set(id, createModelClient({
+      LLM_API_KEY: explicitKey || (current ? settings.LLM_API_KEY : undefined),
+      LLM_BASE_URL: settings[prefix + '_BASE_URL'] || preset.base,
+      LLM_MODEL: settings[prefix + '_MODEL'] || (current && !explicitKey ? settings.LLM_MODEL : undefined) || preset.model
+    }, fetchModel));
+  }
+  if (defaultProvider === 'default') clients.set('default', createModelClient(settings, fetchModel));
+  const preferredProvider = clients.get(defaultProvider)?.ready ? defaultProvider : ([...clients].find(([, client]) => client.ready)?.[0] || defaultProvider);
+  return {
+    defaultProvider: preferredProvider,
+    get(id = preferredProvider) {return clients.get(id);},
+    describe() {return [...clients].map(([id, client]) => ({id, label: MODEL_PRESETS[id]?.label || 'Текущее подключение', available: client.ready}));},
+    get ready() {return [...clients.values()].some(client => client.ready);}
+  };
+}
+
 function defaultModel(base) {
   if (base === DEFAULT_BASE_URL) return DEFAULT_MODEL;
   if (base === SHARELLM_BASE_URL) return SHARELLM_MODEL;
@@ -38,8 +68,21 @@ export async function loadProviderSettings(settings = process.env, path = new UR
   if (connection?._type !== 'newapi_channel_conn' || !base || typeof connection.key !== 'string' || !connection.key.trim() || (connection.model !== undefined && (typeof connection.model !== 'string' || !connection.model.trim()))) {
     throw new Error('Проверь формат подключения в .env.connection.json: нужны тип newapi_channel_conn, HTTPS-адрес url и ключ key.');
   }
+  const profiles = {};
+  if (connection.providers !== undefined) {
+    if (!connection.providers || typeof connection.providers !== 'object' || Array.isArray(connection.providers)) throw new Error('Проверь серверные профили подключения ИИ.');
+    for (const [id, value] of Object.entries(connection.providers)) {
+      const profileBase = normalizeBase(value?.url);
+      if (!Object.hasOwn(MODEL_PRESETS, id) || !profileBase || typeof value?.key !== 'string' || !value.key.trim() || (value.model !== undefined && (typeof value.model !== 'string' || !value.model.trim()))) throw new Error('Проверь серверные профили подключения ИИ.');
+      const prefix = id.toUpperCase();
+      profiles[prefix + '_API_KEY'] = value.key.trim();
+      profiles[prefix + '_BASE_URL'] = profileBase;
+      profiles[prefix + '_MODEL'] = value.model?.trim() || MODEL_PRESETS[id].model;
+    }
+  }
   return {
     ...settings,
+    ...profiles,
     LLM_API_KEY: connection.key.trim(),
     LLM_BASE_URL: base,
     LLM_MODEL: connection.model?.trim() || defaultModel(base) || settings.LLM_MODEL
@@ -137,13 +180,13 @@ export function createModelClient(settings, fetchModel = globalThis.fetch) {
   const endpoint = base && base + '/chat/completions';
   const stream = base === SHARELLM_BASE_URL && model === SHARELLM_MODEL;
   const ready = Boolean(key && model && endpoint);
-  async function ask(messages, {maxTokens = 8000} = {}) {
+  async function ask(messages, {maxTokens = 8000, timeoutMs = 240000} = {}) {
     if (!ready) throw new RequestError(503, 'ИИ пока не подключён. Выбери обычную практику.');
     let response;
     try {
       response = await fetchModel(endpoint, {
         method: 'POST', headers: {'Content-Type': 'application/json', Authorization: `Bearer ${key}`},
-        signal: AbortSignal.timeout(240000), redirect: 'error',
+        signal: AbortSignal.timeout(timeoutMs), redirect: 'error',
         body: JSON.stringify({model, stream, messages, response_format: {type: 'json_object'}, max_tokens: maxTokens})
       });
     } catch (error) {

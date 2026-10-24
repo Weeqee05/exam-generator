@@ -42,7 +42,6 @@ def choose_settings(page, topic, level, count):
 
 
 def send_answer(page, text):
-    page.click('#mode-answer')
     page.fill('#chat-input', text)
     page.click('#chat-send')
 
@@ -81,7 +80,7 @@ class SimulatedAPI:
                  'chat': []}
                 for _ in range(config['count'])
             ],
-            'solved': [False] * config['count'],
+            'provider': 'gemini', 'solved': [False] * config['count'],
         }
         self.variants.insert(0, value)
         return value
@@ -110,6 +109,8 @@ class SimulatedAPI:
         self.calls.append((path, body))
         if path == '/api/status':
             return route.fulfill(json={'aiAvailable': True})
+        if path == '/api/models':
+            return route.fulfill(json={'defaultProvider':'gemini','providers':[{'id':'gemini','label':'Gemini','available':True},{'id':'qwen','label':'Qwen','available':True}]})
         if path == '/api/history':
             return route.fulfill(json={'variants': self.variants})
         if path.startswith('/api/variants/'):
@@ -120,10 +121,19 @@ class SimulatedAPI:
                 self.pending_generate.append(route)
                 return
             return route.fulfill(json={'variant': self.variant(body['config'], body.get('source', 'ai'))})
-        match = re.fullmatch(r'/api/tasks/([^/]+)/(check|hint|solution|chat|similar)', path)
+        match = re.fullmatch(r'/api/tasks/([^/]+)/(check|hint|solution|chat|similar|respond)', path)
         assert match, (request.method, path)
         variant, index, task = self.find_task(match[1])
         action = match[2]
+        automatic = action == 'respond'
+        if automatic:
+            text = body.get('message','').strip()
+            if text == 'Напиши подробное решение': action='solution'
+            elif re.fullmatch(r'[0-9.,/ +*-]+',text): action='check';body['answer']=text
+            else: action='chat'
+        def reply(data):
+            kind={'check':'feedback','solution':'solution','similar':'variant'}.get(action,'message')
+            return route.fulfill(json={'kind':kind,**data} if automatic else data)
         if action == 'check':
             if self.next_check_error:
                 self.next_check_error = False
@@ -136,18 +146,18 @@ class SimulatedAPI:
                 return route.fulfill(status=400, json={'error': 'Введи ответ перед проверкой.'})
             verdict = 'correct' if answer in {'0,5', '0.5', '1/2'} else 'incorrect'
             variant['solved'][index] = variant['solved'][index] or verdict == 'correct'
-            return route.fulfill(json=self.checked(verdict))
+            return reply(self.checked(verdict))
         if action == 'hint':
-            return route.fulfill(json={'message': 'Начни с преобразования дроби в десятичную запись.'})
+            return reply({'message': 'Начни с преобразования дроби в десятичную запись.'})
         if action == 'solution':
-            return route.fulfill(json={'answer': '0,5', 'explanation': 'Одна из двух равных частей — половина.'})
+            return reply({'answer': '0,5', 'explanation': 'Одна из двух равных частей — половина.'})
         if action == 'chat':
             text = body.get('message', '')
             message = 'Сначала определи, на сколько равных частей делят целое. <script>alert(1)</script>'
             task['chat'].extend([{'role': 'user', 'content': text}, {'role': 'assistant', 'content': message}])
-            return route.fulfill(json={'message': message})
+            return reply({'message': message})
         if action == 'similar':
-            return route.fulfill(json={'variant': self.variant({**variant['config'], 'count': 1}, variant['source'])})
+            return reply({'variant': self.variant({**variant['config'], 'count': 1}, variant['source'])})
         raise AssertionError(action)
 
 
@@ -180,7 +190,7 @@ with sync_playwright() as playwright:
     question=page.locator('#task-question').inner_text()
     upper=int(re.search(r'range\((\d+)\)',question).group(1)); factor=int(re.search(r's\s*\+=\s*(\d+)\s*\*\s*i',question).group(1))
     expected=factor*sum(range(upper))
-    page.click('#chat-send'); expect(page.locator('#chat-error')).to_contain_text('введи')
+    page.click('#chat-send'); expect(page.locator('#chat-error')).to_contain_text('Напиши')
     send_answer(page,str(expected+1)); expect(page.locator('.verdict-label').last).to_have_text('Неверно')
     send_answer(page,f'{expected*2}/2'); expect(page.locator('.verdict-label').last).to_have_text('Верно')
     expect(page.locator('#progress-label')).to_contain_text('1 из 3')
@@ -191,6 +201,8 @@ with sync_playwright() as playwright:
     page.locator(f'[data-select-task="{first_task}"]').click()
     expect(page.locator('#chat-input')).to_have_value('мой черновик')
     page.reload(); expect(page.locator('#task-question')).to_have_text(question,use_inner_text=True)
+    expect(page.locator('#chat-messages')).to_contain_text(f'{expected*2}/2')
+    expect(page.locator('#chat-messages')).to_contain_text('Верно')
     expect(page.locator('#chat-input')).to_have_value('мой черновик')
     expect(page.locator('#progress-label')).to_contain_text('1 из 3')
     assert not solution_requests
@@ -203,7 +215,7 @@ with sync_playwright() as playwright:
     print('PASS browser: conversation answer checking, independent calculation, equivalent fractions, drafts, restoration and explicit solution')
 
     # Free dialogue is deliberately distinct from grading the same input.
-    page.click('#mode-question'); page.fill('#chat-input','Как начать решение?');page.locator('#chat-input').press('Enter')
+    page.fill('#chat-input','Как начать решение?');page.locator('#chat-input').press('Enter')
     expect(page.locator('#chat-messages')).to_contain_text('Как начать решение?')
     expect(page.locator('#chat-send')).to_be_enabled()
     with page.expect_download() as saved:
@@ -216,7 +228,7 @@ with sync_playwright() as playwright:
     page.click('#nav-history'); page.fill('#history-search','нет такого занятия'); expect(page.locator('.empty-history')).to_be_visible()
     page.fill('#history-search','Комплексные'); page.locator('[data-load]').first.click(); expect(page.locator('#history-dialog')).not_to_be_visible()
     page.click('#rail-guide'); expect(page.locator('#guide-dialog')).to_be_visible();page.keyboard.press('Escape')
-    print('PASS browser: question mode, keyboard submit, export/print, history search and guide')
+    print('PASS browser: unified chat, keyboard submit, export/print, history search and guide')
 
     for width in (320,390,768,1024,1440):
         page.set_viewport_size({'width':width,'height':1000})
@@ -249,15 +261,27 @@ with sync_playwright() as playwright:
     expect(ai_page.locator('#chat-send')).to_be_disabled()
     ai_page.locator('#chat-form').evaluate('(f)=>f.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true}))')
     assert len(fixture.pending_check)==1
-    fixture.pending_check.pop().fulfill(json=fixture.checked('correct'));fixture.hold_check=False
+    fixture.pending_check.pop().fulfill(json={'kind':'feedback',**fixture.checked('correct')});fixture.hold_check=False
     expect(ai_page.locator('.verdict-label').last).to_have_text('Верно')
     send_answer(ai_page,'1');expect(ai_page.locator('.verdict-label').last).to_have_text('Неверно')
-    fixture.next_check_error=True;ai_page.click('#chat-send')
+    fixture.next_check_error=True;ai_page.fill('#chat-input','1');ai_page.click('#chat-send')
     expect(ai_page.locator('#chat-error')).to_contain_text('Проверка временно недоступна')
     expect(ai_page.locator('#chat-input')).to_have_value('1');expect(ai_page.locator('#chat-send')).to_be_enabled()
+    fixture.hold_check=True;send_answer(ai_page,'0,5')
+    fixture.pending_check.pop().fulfill(json={'kind':'feedback',**fixture.checked('clarify'),'explanation':'Уточни, какое значение ты получил?','error':'Ответ отсутствует.','hint':'Ненужный повтор.'})
+    fixture.hold_check=False
+    expect(ai_page.locator('.verdict-label').last).to_have_text('Уточни ответ')
+    assert 'Что исправить' not in ai_page.locator('.reply').last.inner_text()
+    assert 'Ответ отсутствует' not in ai_page.locator('.reply').last.inner_text()
+    assert 'Ненужный повтор' not in ai_page.locator('.reply').last.inner_text()
     first_id=fixture.variants[0]['tasks'][0]['id'];second_id=fixture.variants[0]['tasks'][1]['id']
-    ai_page.click('#mode-question');ai_page.fill('#chat-input','Почему нужно делить числитель?');ai_page.click('#chat-send')
+    assert ai_page.locator('#mode-answer').count()==0
+    ai_page.select_option('#chat-provider','qwen')
+    ai_page.fill('#chat-input','Почему нужно делить числитель?');ai_page.click('#chat-send')
     expect(ai_page.locator('#chat-messages')).to_contain_text('Сначала определи')
+    assert any(path==f'/api/tasks/{first_id}/respond' and body.get('provider')=='qwen' for path,body in fixture.calls)
+    ai_page.reload();expect(ai_page.locator('#chat-provider')).to_have_value('qwen')
+    expect(ai_page.locator('#chat-messages')).to_contain_text('Почему нужно делить числитель?')
     assert ai_page.locator('#chat-messages script').count()==0
     ai_page.locator('[data-chat-action="hint"]').click();expect(ai_page.locator('#chat-messages')).to_contain_text('Начни с преобразования')
     expect(ai_page.locator('#chat-send')).to_be_enabled()
@@ -265,12 +289,14 @@ with sync_playwright() as playwright:
     assert any(path==f'/api/tasks/{first_id}/chat' and body.get('action')=='simpler' for path,body in fixture.calls)
     ai_page.locator(f'[data-select-task="{second_id}"]').click()
     expect(ai_page.locator('#chat-messages')).not_to_contain_text('Почему нужно делить числитель?')
-    ai_page.click('#mode-question');ai_page.fill('#chat-input','Объясни второе задание.');ai_page.click('#chat-send')
+    ai_page.fill('#chat-input','Объясни второе задание.');ai_page.click('#chat-send')
     expect(ai_page.locator('#chat-messages')).to_contain_text('Объясни второе задание.')
     ai_page.locator(f'[data-select-task="{first_id}"]').click()
     expect(ai_page.locator('#chat-messages')).to_contain_text('Почему нужно делить числитель?')
     assert not any(path.endswith('/solution') for path,_ in fixture.calls)
-    ai_page.locator('[data-chat-action="solution"]').click();expect(ai_page.locator('.solution-content')).to_contain_text('Одна из двух равных частей')
+    ai_page.fill('#chat-input','Напиши подробное решение');ai_page.click('#chat-send')
+    expect(ai_page.locator('.solution-content')).to_contain_text('Одна из двух равных частей')
+    assert any(path==f'/api/tasks/{first_id}/respond' and body.get('message')=='Напиши подробное решение' for path,body in fixture.calls)
     ai_page.click('#new-dialog');fixture.hold_generate=True;ai_page.click('#generate-button')
     expect(ai_page.locator('#generation-status')).to_be_visible()
     fixture.pending_generate.pop().fulfill(status=502,json={'error':'Сервис ИИ временно недоступен.'});fixture.hold_generate=False
@@ -290,7 +316,7 @@ with sync_playwright() as playwright:
     ai_page.locator('[data-chat-action="similar"]').click();expect(ai_page.locator('[data-select-task]')).to_have_count(1)
     assert fixture.variants[0]['config']['count']==1 and fixture.variants[0]['source']=='ai'
     assert not errors,errors
-    print('PASS browser: mocked AI locking/errors/safe text, answer/question routing, task-bound chat and all quick actions')
+    print('PASS browser: mocked AI locking/errors/safe text, automatic routing and model selection, task-bound chat and all quick actions')
     for blocked_getter in (True, False):
         guarded = browser.new_context(viewport={'width':390,'height':844})
         if blocked_getter:
@@ -307,7 +333,6 @@ with sync_playwright() as playwright:
         expect(guarded_page.locator('.code-block')).to_contain_text('<img src=x')
         assert guarded_page.locator('.code-block img').count() == 0
         guarded_page.fill('#chat-input','черновик')
-        guarded_page.click('#mode-question')
         guarded_page.fill('#chat-input','первая строка')
         before = len(guarded_fixture.calls)
         guarded_page.locator('#chat-input').press('Shift+Enter')

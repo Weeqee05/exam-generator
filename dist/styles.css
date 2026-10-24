@@ -582,24 +582,6 @@ h1 {
   box-shadow: 0 0 0 2px #d8fc7310;
 }
 
-.composer-mode {
-  display: flex;
-  gap: 5px;
-  padding: 0 3px 8px;
-}
-
-.composer-mode button {
-  border-radius: 6px;
-  padding: 5px 9px;
-  font-size: 10px;
-  color: #a9b6b8;
-}
-
-.composer-mode button[aria-pressed=true] {
-  background: #d8fc7315;
-  color: var(--lime);
-}
-
 .composer-input {
   display: flex;
   align-items: flex-end;
@@ -1586,10 +1568,6 @@ input[type=number] {
     padding: 7px 4px;
     min-height: 54px;
   }
-  .composer-mode button {
-    font-size: 10px;
-    padding: 5px 6px;
-  }
   .send-button {
     width: 37px;
     height: 40px;
@@ -1727,4 +1705,16 @@ input[type=number] {
   .session-tools .text-button {
     font-size: 10px;
   }
+}
+
+/* Server-side model profiles; the browser receives availability, never keys. */
+.provider-picker { margin-top: 20px; }
+.provider-picker label { display: block; font-size: 11px; color: var(--muted); margin-bottom: 7px; }
+.provider-picker select { font-size: 13px; }
+.provider-picker .field-note { margin-bottom: 0; font-size: 10px; }
+@media (max-width: 850px) {
+  .provider-picker { display: flex; align-items: center; gap: 12px; margin-top: 13px; }
+  .provider-picker label { margin: 0; font-size: 10px; }
+  .provider-picker select { width: auto; flex: 1; min-height: 35px; padding: 7px; font-size: 12px; }
+  .provider-picker .field-note { display: none; }
 }

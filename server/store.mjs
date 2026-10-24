@@ -23,9 +23,9 @@ export function createStore({now = Date.now, ttl = 24 * 60 * 60 * 1000, maxSessi
     }
     return value;
   }
-  function add(owner, {number, config, source, tasks}) {
+  function add(owner, {number, config, source, tasks, provider}) {
     const variant = {
-      id: randomUUID(), number, config: {...config}, source, created: new Date(now()).toISOString(),
+      id: randomUUID(), number, config: {...config}, source, provider, created: new Date(now()).toISOString(),
       tasks: tasks.map(task => ({...task, id: randomUUID(), chat: [], solved: false, attempts: []}))
     };
     owner.variants.unshift(variant);
@@ -55,7 +55,7 @@ export function createStore({now = Date.now, ttl = 24 * 60 * 60 * 1000, maxSessi
 // Explicit projection is the boundary between private references and the browser.
 export function publicVariant(variant) {
   return {
-    id: variant.id, number: variant.number, config: {...variant.config}, source: variant.source, created: variant.created,
+    id: variant.id, number: variant.number, config: {...variant.config}, source: variant.source, provider: variant.provider, created: variant.created,
     tasks: variant.tasks.map(task => ({id: task.id, tag: task.tag, question: task.question, chat: task.chat.map(item => ({...item}))})),
     solved: variant.tasks.map(task => task.solved)
   };

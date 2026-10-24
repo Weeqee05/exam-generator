@@ -320,3 +320,88 @@ test('all task actions enforce same-origin JSON and reject oversized student mes
     const response=await app.action(variant.tasks[0].id,action,input);assert.ok([400,413].includes(response.status));
   }
 });
+
+test('model selection routes generation and dialogue to isolated server credentials',async t=>{
+  const both={...settings,LLM_BASE_URL:'https://generativelanguage.googleapis.com/v1beta/openai',LLM_MODEL:'gemini-3.1-flash-lite',QWEN_API_KEY:'qwen-only-test-key'};
+  const requests=[];
+  const app=(await harness(t,{settings:both,fetchModel:async(url,init)=>{
+    requests.push({url,headers:init.headers,body:JSON.parse(init.body)});
+    return modelResponse(requests.length===1?generated():{intent:'chat',message:'Раздели целое на равные части.'});
+  }})).client();
+  const models=await(await app.get('/api/models')).json();
+  assert.deepEqual(models.providers.map(p=>[p.id,p.available]),[['gemini',true],['qwen',true]]);
+  assert.ok(!JSON.stringify(models).includes('test-key'));
+  const {variant}=await(await app.post('/api/generate',{config,source:'ai',variantId:1,provider:'gemini'})).json();
+  const response=await app.action(variant.tasks[0].id,'respond',{message:'Объясни, как начать?',provider:'qwen'});
+  assert.equal(response.status,200);assert.equal((await response.json()).kind,'message');
+  assert.match(requests[0].url,/generativelanguage/);assert.equal(requests[0].headers.Authorization,'Bearer '+settings.LLM_API_KEY);
+  assert.match(requests[1].url,/sharellm/);assert.equal(requests[1].headers.Authorization,'Bearer qwen-only-test-key');
+  assert.equal(requests[1].body.model,'qwen3.8-flash');
+  assert.ok(!JSON.stringify(requests[1].body.messages).includes(reference.answer));
+  assert.equal((await app.action(variant.tasks[0].id,'respond',{message:'Привет',provider:'https://evil.invalid'})).status,400);
+  assert.equal(requests.length,2);
+});
+
+test('automatic dialogue distinguishes questions, numerical answers, written work and explicit solutions',async t=>{
+  let calls=0;
+  const app=(await harness(t,{settings,fetchModel:async(_url,init)=>{
+    calls++;const messages=JSON.parse(init.body).messages;
+    if(calls===1)return modelResponse(generated());
+    if(calls===2){assert.ok(!JSON.stringify(messages).includes(reference.explanation));return modelResponse({intent:'chat',message:'Начни с представления дроби как деления.'});}
+    if(calls===3)return modelResponse({intent:'answer'});
+    assert.ok(JSON.stringify(messages).includes(reference.explanation));
+    return modelResponse({verdict:'correct',explanation:'Рассуждение верное.',error:'',hint:''});
+  }})).client();
+  const {variant}=await(await app.generate('ai')).json(),id=variant.tasks[0].id;
+  const chat=await(await app.action(id,'respond',{message:'Я не понимаю, как начать'})).json();assert.equal(chat.kind,'message');
+  const wrong=await(await app.action(id,'respond',{message:'0,6'})).json();assert.equal(wrong.kind,'feedback');assert.equal(wrong.verdict,'incorrect');
+  const right=await(await app.action(id,'respond',{message:'0,5'})).json();assert.equal(right.verdict,'correct');assert.equal(calls,2);
+  const written=await(await app.action(id,'respond',{message:'Я разделил целое на две равные части и получил половину.'})).json();assert.equal(written.kind,'feedback');assert.equal(written.method,'ai');assert.equal(calls,4);
+  const hint=await(await app.action(id,'respond',{message:'Дай подсказку'})).json();assert.equal(hint.kind,'message');assert.equal(calls,4);
+  const solution=await(await app.action(id,'respond',{message:'Напиши подробное решение'})).json();assert.equal(solution.kind,'solution');assert.equal(solution.answer,reference.answer);assert.equal(calls,4);
+  assert.equal((await app.action(id,'respond',{message:' '})).status,400);
+  assert.equal((await app.action(id,'respond',{message:'a'.repeat(4001)})).status,400);
+  const restored=(await(await app.get('/api/variants/'+variant.id)).json()).variant;publicOnly(restored);
+});
+
+test('clarification contains one explanation without a fabricated error block or boilerplate question',async t=>{
+  let calls=0;
+  const task={...reference,question:'Обоснуй утверждение из условия.',answer:'PRIVATE_REFERENCE'};
+  const app=(await harness(t,{settings,fetchModel:async()=>{
+    calls++;return modelResponse(calls===1?generated([task]):{verdict:'clarify',explanation:'Уточни, что обозначает x в твоём решении?',error:'Ответ отсутствует.',hint:'Сначала запиши ответ.'});
+  }})).client();
+  const {variant}=await(await app.generate('ai')).json();
+  const result=await(await app.action(variant.tasks[0].id,'check',{answer:'Я обозначил это через x'})).json();
+  assert.equal(result.explanation,'Уточни, что обозначает x в твоём решении?');
+  assert.equal(result.error,'');assert.equal(result.hint,'');
+});
+
+test('unavailable model is shown disabled and never silently uses another key',async t=>{
+  let calls=0;
+  const app=(await harness(t,{settings,fetchModel:async()=>{calls++;return modelResponse(generated());}})).client();
+  const models=await(await app.get('/api/models')).json();assert.equal(models.providers.find(p=>p.id==='qwen').available,false);
+  const response=await app.post('/api/generate',{config,source:'ai',variantId:1,provider:'qwen'});
+  assert.equal(response.status,503);assert.equal(calls,0);
+});
+
+test('automatic interpretation and grading share one request deadline',async t=>{
+  const now=Date.now;let elapsed=0,calls=0;
+  t.mock.method(Date,'now',()=>now()+elapsed);
+  const app=(await harness(t,{settings,fetchModel:async()=>{
+    calls++;
+    if(calls===1)return modelResponse(generated());
+    elapsed=300000;return modelResponse({intent:'answer'});
+  }})).client();
+  const {variant}=await(await app.generate('ai')).json();
+  const response=await app.action(variant.tasks[0].id,'respond',{message:'Я нашёл половину делением целого на две равные части.'});
+  assert.equal(response.status,504);assert.equal(calls,2,'a second model operation cannot start after the request budget expires');
+});
+
+test('a standalone Qwen key can be selected without a Gemini key',async t=>{
+  let requested;
+  const app=(await harness(t,{settings:{QWEN_API_KEY:'qwen-standalone-test'},fetchModel:async(url,init)=>{requested={url,body:JSON.parse(init.body)};return modelResponse(generated());}})).client();
+  const models=await(await app.get('/api/models')).json();
+  assert.equal(models.defaultProvider,'qwen');assert.equal(models.providers.find(p=>p.id==='gemini').available,false);
+  assert.equal((await app.generate('ai')).status,200);
+  assert.match(requested.url,/sharellm/);assert.equal(requested.body.model,'qwen3.8-flash');
+});
