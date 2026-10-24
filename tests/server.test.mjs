@@ -9,7 +9,6 @@ import {join} from 'node:path';
 import {createApp, loadProviderSettings} from '../server.mjs';
 import {displayModelTasks, validateModelResult} from '../dist/ai.mjs';
 import {exportVariant} from '../dist/export.mjs';
-import {readSaved} from '../dist/app.mjs';
 import {makeTasks} from '../dist/generator.mjs';
 
 const config={topic:'complex',level:'easy',count:1};
@@ -32,7 +31,30 @@ async function running(t, options={}) {
   server.listen(0,'127.0.0.1');await once(server,'listening');
   t.after(()=>new Promise(resolve=>{server.close(resolve);server.closeAllConnections();}));
   const base=`http://127.0.0.1:${server.address().port}`;
-  return {get:path=>fetch(base+path),post:(data={config,variantId:1},headers={})=>fetch(base+'/api/generate',{method:'POST',headers:{'Content-Type':'application/json',...headers},body:JSON.stringify(data)})};
+  let cookie='';
+  async function request(path,options={}) {
+    const response=await fetch(base+path,{...options,headers:{...(cookie?{Cookie:cookie}:{}),...options.headers}});
+    const setCookie=response.headers.get('set-cookie');
+    if(setCookie)cookie=setCookie.split(';')[0];
+    return response;
+  }
+  return {
+    get:path=>request(path),
+    post:(data={config,variantId:1},headers={})=>request('/api/generate',{method:'POST',headers:{'Content-Type':'application/json',...headers},body:JSON.stringify(data)}),
+    task:(id,action,data={})=>request('/api/tasks/'+id+'/'+action,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(data)})
+  };
+}
+
+function assertPublicVariant(data,expected) {
+  assert.ok(data.variant?.id);
+  assert.deepEqual(data.variant.config,{topic:expected.topic,level:expected.difficulty,count:expected.tasks.length});
+  assert.equal(data.variant.source,'ai');
+  assert.equal(data.variant.tasks.length,expected.tasks.length);
+  data.variant.tasks.forEach((task,index)=>{
+    assert.equal(task.question,expected.tasks[index].question);
+    assert.equal(task.tag,expected.tasks[index].type);
+    for(const privateField of ['answer','explanation','proof','hint','result'])assert.ok(!Object.hasOwn(task,privateField),privateField+' must stay on the server');
+  });
 }
 
 test('ordinary site works without credentials and does not expose configuration',async t=>{
@@ -75,11 +97,14 @@ test('embedded preview requires the explicit string flag',async t=>{
   }
 });
 
-test('model request uses server credentials, validated settings and the displayed prompt',async t=>{
+test('model request uses server credentials and public generation withholds the reference answer',async t=>{
   let received;
   const app=await running(t,{settings,fetchModel:async(url,init)=>{received={url,init};return answer();}});
   assert.deepEqual(await(await app.get('/api/status')).json(),{aiAvailable:true});
-  const response=await app.post();assert.equal(response.status,200);assert.deepEqual(await response.json(),{result});
+  const response=await app.post();assert.equal(response.status,200);
+  const data=await response.json();assertPublicVariant(data,result);
+  const solution=await app.task(data.variant.tasks[0].id,'solution');
+  assert.deepEqual(await solution.json(),{answer:result.tasks[0].answer,explanation:result.tasks[0].explanation});
   assert.equal(received.url,'https://example.invalid/v1/chat/completions');
   assert.equal(received.init.headers.Authorization,'Bearer '+settings.LLM_API_KEY);
   const body=JSON.parse(received.init.body);assert.equal(body.model,'test-model');assert.match(body.messages[1].content,/Комплексные числа/);
@@ -92,6 +117,7 @@ test('invalid inputs, content types and cross-origin requests do not call the pr
   const app=await running(t,{settings,fetchModel:async()=>{calls++;return answer();}});
   assert.equal((await app.post({config:{...config,count:11},variantId:1})).status,400);
   assert.equal((await app.post({config,variantId:0})).status,400);
+  assert.equal((await app.post({config,variantId:1,source:'unknown'})).status,400);
   assert.equal((await app.post(null)).status,400);
   assert.equal((await app.post({padding:'x'.repeat(5000)})).status,413);
   assert.equal((await app.post({}, {'Content-Type':'text/plain'})).status,415);
@@ -149,7 +175,7 @@ test('Qwen SSE handles split UTF-8, CRLF and multiline data while excluding reas
   const app=await running(t,{settings:qwenSettings,fetchModel:async(_url,init)=>{requested=JSON.parse(init.body);return streamed(chunks);}});
   const response=await app.post();
   assert.equal(response.status,200);
-  const data=await response.json();assert.deepEqual(data,{result:unicodeResult});
+  const data=await response.json();assertPublicVariant(data,unicodeResult);
   assert.equal(requested.stream,true);
   assert.ok(!JSON.stringify(data).includes(privateReasoning));
 });
@@ -234,7 +260,7 @@ test('ShareLLM router and model configuration errors are explicit and redact pro
 test('compatible gateway JSON fences are accepted, but truncated output is rejected',async t=>{
   const content='```json\n'+JSON.stringify(result)+'\n```';
   const app=await running(t,{settings,fetchModel:async()=>new Response(JSON.stringify({choices:[{message:{content},finish_reason:'stop'}]}))});
-  assert.deepEqual(await(await app.post()).json(),{result});
+  assertPublicVariant(await(await app.post()).json(),result);
   const truncated=await running(t,{settings,fetchModel:async()=>new Response(JSON.stringify({choices:[{message:{content:JSON.stringify(result)},finish_reason:'length'}]}))});
   assert.equal((await truncated.post()).status,502);
   const failed=await running(t,{settings,fetchModel:async()=>{throw new TypeError('private upstream connection detail');}});
@@ -271,6 +297,7 @@ test('invalid or excessively large model output leaves no accepted variant',asyn
   for(const data of [{...result,topic:'sets'},{...result,tasks:[]},{...result,tasks:[{...result.tasks[0],answer:''}]}]) {
     const app=await running(t,{settings,fetchModel:async()=>answer(data)});
     assert.equal((await app.post()).status,502);
+    assert.deepEqual(await(await app.get('/api/history')).json(),{variants:[]});
   }
   const app=await running(t,{settings,fetchModel:async()=>new Response('x'.repeat(210000))});
   assert.equal((await app.post()).status,413);
@@ -290,12 +317,6 @@ test('model text is escaped and duplicate questions are rejected',()=>{
   const malicious={...result,tasks:[{...result.tasks[0],question:'<img src=x onerror="alert(1)"> & текст'}]};
   const task=displayModelTasks(malicious,config)[0];assert.ok(!task.question.includes('<img'));assert.match(task.question,/&lt;img/);
   assert.throws(()=>validateModelResult({...result,tasks:[result.tasks[0],{...result.tasks[0],question:result.tasks[0].question.toUpperCase()}]},{...config,count:2}));
-});
-
-test('history preserves generated model content and active selection; corrupt entries are ignored',()=>{
-  const variant={id:1,seed:0,config,source:'ai',result,created:'2026-10-21T10:00:00Z',solved:[true]};
-  const saved=readSaved({getItem:()=>JSON.stringify({version:1,sequence:3,activeId:1,history:[{...variant,id:2,result:null},variant,variant]})});
-  assert.equal(saved.history.length,1);assert.deepEqual(saved.history[0].result,result);assert.equal(saved.activeId,1);assert.deepEqual(saved.history[0].solved,[true]);
 });
 
 test('download includes the current worksheet and answers only on request',()=>{

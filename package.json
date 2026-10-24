@@ -1,8 +1,8 @@
 {
   "name": "exam-generator",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
-  "description": "Практикум — учебный генератор заданий и конструктор промптов",
+  "description": "Практикум — ИИ-ассистент для генерации и проверки экзаменационных заданий",
   "type": "module",
   "engines": {
     "node": ">=18"
@@ -11,7 +11,7 @@
     "dev": "node server.mjs",
     "start": "node server.mjs",
     "export:offline": "node scripts/export-offline.mjs",
-    "test": "node tests/verify.mjs && node --test tests/server.test.mjs",
+    "test": "node tests/verify.mjs && node --test tests/*.test.mjs",
     "test:llm": "node scripts/verify-provider.mjs"
   }
 }
