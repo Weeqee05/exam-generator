@@ -18,7 +18,7 @@ import {directAction, feedbackParagraphs, feedbackMethod} from './dist/dialogue.
 
 export {loadProviderSettings, configureRuntimeProxy};
 
-const assets = new Map([['/', ['index.html', 'text/html']], ['/index.html', ['index.html', 'text/html']], ['/styles.css', ['styles.css', 'text/css']], ...['app', 'generator', 'ai', 'export', 'dialogue'].map(name => [`/${name}.mjs`, [`${name}.mjs`, 'text/javascript']])]);
+const assets = new Map([['/', ['index.html', 'text/html']], ['/index.html', ['index.html', 'text/html']], ['/styles.css', ['styles.css', 'text/css']], ...['app', 'generator', 'ai', 'export', 'dialogue', 'format', 'vendor/katex/katex'].map(name => [`/${name}.mjs`, [`${name}.mjs`, 'text/javascript']]), ['/vendor/katex/katex.min.css',['vendor/katex/katex.min.css','text/css']]]);
 const headers = {'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'same-origin', 'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"};
 const SESSION_COOKIE = 'praktikum_session';
 
@@ -261,9 +261,12 @@ export function createApp({settings = process.env, fetchModel = globalThis.fetch
         } finally { task.busy = false; }
       }
       if (!['GET', 'HEAD'].includes(req.method)) throw new RequestError(405, 'Метод не поддерживается.');
-      const asset = assets.get(path);
+      const font = /^\/vendor\/katex\/fonts\/KaTeX_[A-Za-z0-9_-]+\.woff2$/.test(path);
+      const asset = assets.get(path) || (font ? [path.slice(1),'font/woff2'] : null);
       if (!asset) throw new RequestError(404, 'Страница не найдена.');
-      const body = await readFile(new URL('./dist/' + asset[0], import.meta.url));
+      let body;
+      try {body = await readFile(new URL('./dist/' + asset[0], import.meta.url));}
+      catch(error) {if(error.code==='ENOENT') throw new RequestError(404,'Файл не найден.');throw error;}
       res.writeHead(200, {...responseHeaders, 'Content-Type': asset[1] + '; charset=utf-8', 'Cache-Control': 'no-cache', 'Content-Length': body.length});
       res.end(req.method === 'HEAD' ? undefined : body);
     } catch (error) {

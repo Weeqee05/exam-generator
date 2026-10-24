@@ -26,6 +26,15 @@ function streamed(chunks) {
   }}),{headers:{'Content-Type':'text/event-stream; charset=utf-8'}});
 }
 
+test('math renderer and fonts are served locally with no access to private files',async t=>{
+  const app=await running(t);
+  for(const path of ['/format.mjs','/vendor/katex/katex.mjs','/vendor/katex/katex.min.css','/vendor/katex/fonts/KaTeX_Main-Regular.woff2']) {
+    const response=await app.get(path);assert.equal(response.status,200,path);
+    assert.ok((await response.arrayBuffer()).byteLength>100);
+  }
+  for(const path of ['/vendor/katex/fonts/KaTeX_missing.woff2','/vendor/katex/.env.connection.json','/vendor/katex/fonts/../../server.mjs']) assert.equal((await app.get(path)).status,404);
+});
+
 async function running(t, options={}) {
   const server=createApp({settings:{},...options});
   server.listen(0,'127.0.0.1');await once(server,'listening');
@@ -230,7 +239,8 @@ test('imported New API connection works with a root URL and overrides incorrect 
   assert.equal((await app.post()).status,200);
   assert.equal(received.url,'https://sharellm.net/v1/chat/completions');
   assert.equal(received.init.headers.Authorization,'Bearer '+imported.key);
-  assert.equal(JSON.parse(received.init.body).model,'qwen3.8-flash');
+  assert.equal(JSON.parse(received.init.body).model,'qwen3.8-27b');
+  assert.equal(JSON.parse(received.init.body).stream,false);
   assert.equal(loaded.HOST,'127.0.0.1');
   assert.deepEqual(await loadProviderSettings(settings,join(folder,'missing.json')),settings);
   assert.equal((await app.get('/.env.connection.json')).status,404);
@@ -348,7 +358,7 @@ test('local model profiles load independently and reject malformed profiles with
   const connection={_type:'newapi_channel_conn',url:'https://generativelanguage.googleapis.com/v1beta/openai',key:'gemini-profile-key',providers:{qwen:{url:'https://sharellm.net',key:'qwen-profile-key'}}};
   await writeFile(path,JSON.stringify(connection));const loaded=await loadProviderSettings({},path);
   assert.equal(loaded.LLM_API_KEY,'gemini-profile-key');assert.equal(loaded.QWEN_API_KEY,'qwen-profile-key');
-  assert.equal(loaded.QWEN_MODEL,'qwen3.8-flash');assert.equal(loaded.QWEN_BASE_URL,'https://sharellm.net/v1');
+  assert.equal(loaded.QWEN_MODEL,'qwen3.8-27b');assert.equal(loaded.QWEN_BASE_URL,'https://sharellm.net/v1');
   const app=await running(t,{settings:loaded});const response=await app.get('/api/models');
   const data=await response.json();assert.equal(data.providers.find(p=>p.id==='qwen').available,true);
   assert.ok(!JSON.stringify(data).includes('profile-key'));

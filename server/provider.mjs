@@ -3,7 +3,8 @@ import {readFile} from 'node:fs/promises';
 import {RequestError, readLimited} from './errors.mjs';
 
 const SHARELLM_BASE_URL = 'https://sharellm.net/v1';
-const SHARELLM_MODEL = 'qwen3.8-flash';
+const SHARELLM_MODEL = 'qwen3.8-27b';
+const LEGACY_STREAM_MODEL = 'qwen3.8-flash';
 const DEFAULT_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/openai';
 const DEFAULT_MODEL = 'gemini-3.1-flash-lite';
 
@@ -178,7 +179,7 @@ export function createModelClient(settings, fetchModel = globalThis.fetch) {
   const base = normalizeBase(settings.LLM_BASE_URL?.trim() || DEFAULT_BASE_URL);
   const model = settings.LLM_MODEL?.trim() || defaultModel(base);
   const endpoint = base && base + '/chat/completions';
-  const stream = base === SHARELLM_BASE_URL && model === SHARELLM_MODEL;
+  const stream = base === SHARELLM_BASE_URL && model === LEGACY_STREAM_MODEL;
   const ready = Boolean(key && model && endpoint);
   async function ask(messages, {maxTokens = 8000, timeoutMs = 240000} = {}) {
     if (!ready) throw new RequestError(503, 'ИИ пока не подключён. Выбери обычную практику.');

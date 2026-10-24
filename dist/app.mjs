@@ -1,4 +1,5 @@
 import {feedbackParagraphs, feedbackMethod} from './dialogue.mjs';
+import {formatText} from './format.mjs';
 import {TOPICS, LEVELS, validConfig, hasTemplates, topicName, escapeHtml} from './generator.mjs';
 
 // Only the selected variant id and the student's drafts are persisted here.
@@ -156,11 +157,11 @@ export function mountApp(doc, storage, env = {}) {
     const lines = task.question.split('\n');
     const start = current.config.topic === 'python' ? lines.findIndex(line => /^(?:[A-Za-z_]\w*\s*=|for\s|while\s|print\(|def\s|if\s)/.test(line.trimStart())) : -1;
     if (start >= 0) {
-      if (start) {const p=doc.createElement('p');p.textContent=lines.slice(0,start).join('\n');area.append(p);}
+      if (start) {const p=doc.createElement('p');p.innerHTML=formatText(lines.slice(0,start).join('\n'));area.append(p);}
       const pre=doc.createElement('pre');pre.className='code-block';const code=doc.createElement('code');
       code.innerHTML=escapeHtml(lines.slice(start).join('\n')).replace(/\b(for|in|range|print|while|if|else|def|return|and|or|not)\b/g,'<span class="code-keyword">$1</span>');
       pre.append(code);area.append(pre);
-    } else area.textContent = task.question;
+    } else area.innerHTML = formatText(task.question);
   }
   function renderMessages() {
     const task=selectedTask(); if (!task) return;
@@ -170,10 +171,10 @@ export function mountApp(doc, storage, env = {}) {
       if (item.kind === 'feedback') {
         const f=item.feedback; css=' verdict-'+f.verdict;
         const paragraphs = feedbackParagraphs(f);
-        body=`<span class="verdict-label">${labels[f.verdict]}</span>${paragraphs.map(text=>`<p>${escapeHtml(text)}</p>`).join('')}<span class="feedback-method">${feedbackMethod(f)}</span>`;
+        body=`<span class="verdict-label">${labels[f.verdict]}</span>${paragraphs.map(text=>`<p>${formatText(text)}</p>`).join('')}<span class="feedback-method">${feedbackMethod(f)}</span>`;
       } else if (item.kind === 'solution') {
-        css=' solution-content'; body=`<strong>Ответ</strong><div class="solution-answer">${escapeHtml(item.solution.answer)}</div><strong>Разбор по шагам</strong><div class="solution-explanation">${escapeHtml(item.solution.explanation)}</div>`;
-      } else body=escapeHtml(item.content);
+        css=' solution-content'; body=`<strong>Ответ</strong><div class="solution-answer">${formatText(item.solution.answer)}</div><strong>Разбор по шагам</strong><div class="solution-explanation">${formatText(item.solution.explanation)}</div>`;
+      } else body=formatText(item.content);
       return `<article class="message from-assistant"><span class="avatar" aria-hidden="true">✦</span><div class="message-body"><div class="message-author">Ассистент</div><div class="reply${css}">${body}</div></div></article>`;
     }).join('');
   }

@@ -446,7 +446,7 @@ test('model selection routes generation and dialogue to isolated server credenti
   assert.equal(response.status,200);assert.equal((await response.json()).kind,'message');
   assert.match(requests[0].url,/generativelanguage/);assert.equal(requests[0].headers.Authorization,'Bearer '+settings.LLM_API_KEY);
   assert.match(requests[1].url,/sharellm/);assert.equal(requests[1].headers.Authorization,'Bearer qwen-only-test-key');
-  assert.equal(requests[1].body.model,'qwen3.8-flash');
+  assert.equal(requests[1].body.model,'qwen3.8-27b');
   assert.ok(!JSON.stringify(requests[1].body.messages).includes(reference.answer));
   assert.equal((await app.action(variant.tasks[0].id,'respond',{message:'Привет',provider:'https://evil.invalid'})).status,400);
   assert.equal(requests.length,2);
@@ -513,5 +513,5 @@ test('a standalone Qwen key can be selected without a Gemini key',async t=>{
   const models=await(await app.get('/api/models')).json();
   assert.equal(models.defaultProvider,'qwen');assert.equal(models.providers.find(p=>p.id==='gemini').available,false);
   assert.equal((await app.generate('ai')).status,200);
-  assert.match(requested.url,/sharellm/);assert.equal(requested.body.model,'qwen3.8-flash');
+  assert.match(requested.url,/sharellm/);assert.equal(requested.body.model,'qwen3.8-27b');
 });

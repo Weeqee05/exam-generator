@@ -418,6 +418,43 @@ with sync_playwright() as playwright:
     expect(fallback_page.locator('#provider-status')).to_contain_text('основная модель сервера')
     assert next(body for path,body in fallback_fixture.calls if path=='/api/generate')['provider'] is None
     fallback_context.close()
+    math_context=browser.new_context(viewport={'width':1440,'height':1000})
+    math_fixture=SimulatedAPI()
+    sample=math_fixture.variant({'topic':'algebra','level':'medium','count':2})
+    sample['tasks'][0]['question']='Найдите все целые решения неравенства |x^2 - 4x - 5| < 7. Запишите их в порядке возрастания через запятую.'
+    sample['tasks'][0]['tag']='Неравенство с модулем'
+    sample['tasks'][1]['question']=r'Вычисли \(\frac{1}{2}+\sqrt{9}\), затем рассмотри выражение \[' + '+'.join(['x^{2}']*90) + r'\]. Код: `print("x**2 < 7")`'
+    def math_route(route):
+        if urlparse(route.request.url).path.endswith('/solution'):
+            return route.fulfill(json={'answer':'−1, 0, 4, 5','explanation':r'Преобразуем: \[2 < (x-2)^2 < 16\]. Значит, целое расстояние от 2 равно 2 или 3. Например, дробь \(\frac{1}{2}\) здесь не является целым ответом.'})
+        return math_fixture.route(route)
+    math_context.route('**/api/**',math_route)
+    math_page=math_context.new_page();math_page.on('pageerror',lambda error:errors.append(str(error)))
+    font_responses=[]
+    math_page.on('response',lambda response:font_responses.append(response.status) if response.url.endswith('.woff2') else None)
+    math_page.goto(BASE)
+    expect(math_page.locator('#task-question .katex')).to_have_count(1)
+    expect(math_page.locator('#task-question msup')).to_have_count(1)
+    assert float(math_page.locator('#task-question').evaluate('(e)=>parseFloat(getComputedStyle(e).fontSize)'))>15
+    math_page.evaluate('document.fonts.ready')
+    screenshot_clean(math_page,ARTIFACTS/'math-desktop.png')
+    math_page.set_viewport_size({'width':390,'height':844})
+    screenshot_clean(math_page,ARTIFACTS/'math-mobile.png')
+    math_page.locator('[data-chat-action="solution"]').click()
+    expect(math_page.locator('.solution-explanation .katex')).to_have_count(2)
+    expect(math_page.locator('.solution-explanation mfrac')).to_have_count(1)
+    math_page.locator('[data-select-task]').last.click()
+    expect(math_page.locator('#task-question mfrac')).to_have_count(1)
+    expect(math_page.locator('#task-question msqrt')).to_have_count(1)
+    expect(math_page.locator('#task-question .inline-code')).to_have_text('print("x**2 < 7")')
+    assert math_page.locator('.katex-error').count()==0
+    for width in (320,390,768,1024,1440):
+        math_page.set_viewport_size({'width':width,'height':1000})
+        assert not math_page.evaluate('() => document.documentElement.scrollWidth>innerWidth'), f'Math overflow {width}'
+    assert font_responses and all(status==200 for status in font_responses)
+    assert not errors,errors
+    math_context.close()
+    print('PASS browser: legacy inequality, LaTeX fractions/roots/solutions, code preserved, local fonts and enlarged responsive text')
     for blocked_getter in (True, False):
         guarded = browser.new_context(viewport={'width':390,'height':844})
         if blocked_getter:
