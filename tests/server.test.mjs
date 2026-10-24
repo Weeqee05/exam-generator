@@ -151,6 +151,7 @@ test('Gemini defaults only require a server key and custom providers require a m
   assert.equal(received.url,'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions');
   assert.equal(JSON.parse(received.init.body).model,'gemini-3.1-flash-lite');
   assert.equal(JSON.parse(received.init.body).stream,false);
+  assert.equal(JSON.parse(received.init.body).max_tokens,2048);
   const custom=await running(t,{settings:{LLM_API_KEY:'test-only',LLM_BASE_URL:'https://example.invalid/v1'}});
   assert.deepEqual(await(await custom.get('/api/status')).json(),{aiAvailable:false});
 });
@@ -213,7 +214,7 @@ test('incomplete, invalid, error and truncated SSE responses cannot become accep
 });
 
 test('stream size limits and errors during body reading preserve useful status codes',async t=>{
-  const oversizedRaw=event({choices:[{delta:{reasoning_content:'x'.repeat(2*1024*1024)}}]});
+  const oversizedRaw=event({choices:[{delta:{reasoning_content:'x'.repeat(8*1024*1024)}}]});
   const oversizedContent=textEvent('я'.repeat(100001));
   for(const wire of [oversizedRaw,oversizedContent]) {
     const app=await running(t,{settings:qwenSettings,fetchModel:async()=>streamed([wire])});

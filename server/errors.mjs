@@ -1,7 +1,9 @@
 // Controlled application errors are safe to show; unexpected errors stay private.
 export class RequestError extends Error {
-  constructor(status, message) { super(message); this.status = status; }
+  constructor(status, message, code) { super(message); this.status = status; if(code) this.code = code; }
 }
+
+export const truncatedModel = () => new RequestError(502,'ИИ исчерпал лимит ответа и не завершил результат. Попробуй меньше заданий или другую модель.','MODEL_TRUNCATED');
 
 export async function readLimited(stream, limit) {
   let length = 0;

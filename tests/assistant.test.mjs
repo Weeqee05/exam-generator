@@ -42,6 +42,52 @@ function publicOnly(variant) {
   }
 }
 
+test('Qwen reserves reasoning space and a truncated generation gets only one bounded retry',async t=>{
+  const parameters={topic:'custom',customTopic:'Пределы функций',level:'medium',count:3};
+  const tasks=[1,2,3].map(n=>({...reference,question:`Вычисли предел постоянной функции f(x) = ${n} при x → 0.`,answer:String(n)}));
+  const requests=[];let app;
+  app=(await harness(t,{settings:{QWEN_API_KEY:'qwen-budget-test'},fetchModel:async(url,init)=>{
+    requests.push(JSON.parse(init.body));
+    if(requests.length===1)return modelResponseWithLength();
+    const history=await(await app.get('/api/history')).json();assert.equal(history.variants.length,1,'unfinished generation must not be stored');
+    return modelResponse(generated(tasks,parameters));
+  }})).client();
+  await app.generate('local');
+  const response=await app.post('/api/generate',{config:parameters,source:'ai',provider:'qwen',variantId:2});
+  assert.equal(response.status,200);const {variant}=await response.json();publicOnly(variant);
+  assert.equal(variant.tasks.length,3);assert.equal(variant.provider,'qwen');assert.equal(requests.length,2);
+  assert.ok(requests[0].max_tokens>=19000);assert.ok(requests[1].max_tokens>requests[0].max_tokens);
+  assert.equal(requests[0].enable_thinking,undefined);assert.equal(requests[0].reasoning_effort,undefined);
+  assert.match(requests[1].messages[1].content,/Эта попытка последняя/);
+  assert.equal((await(await app.get('/api/history')).json()).variants.length,2);
+});
+
+function modelResponseWithLength() {
+  return new Response(JSON.stringify({choices:[{message:{content:''},finish_reason:'length'}]}),{headers:{'Content-Type':'application/json'}});
+}
+
+test('schema repair succeeds once, while repeated invalid output leaves no partial variant',async t=>{
+  let calls=0;
+  const app=(await harness(t,{settings,fetchModel:async()=>modelResponse(++calls===1?generated([{...reference,hint:''}]):generated())})).client();
+  assert.equal((await app.generate('ai')).status,200);assert.equal(calls,2);
+  let failedCalls=0;
+  const failed=(await harness(t,{settings,fetchModel:async()=>{failedCalls++;return modelResponse(generated([]));}})).client();
+  const response=await failed.generate('ai');assert.equal(response.status,502);
+  assert.equal((await response.json()).code,'MODEL_VARIANT_INVALID');assert.equal(failedCalls,2);
+  assert.deepEqual((await(await failed.get('/api/history')).json()).variants,[]);
+});
+
+test('provider overload, invalid credentials and exhausted deadlines never cause automatic repeats',async t=>{
+  for(const status of [401,429,503,524]){
+    let calls=0;const app=(await harness(t,{settings,fetchModel:async()=>{calls++;return new Response('private provider data',{status});}})).client();
+    assert.ok(!(await app.generate('ai')).ok);assert.equal(calls,1);
+  }
+  let now=Date.now(),calls=0;t.mock.method(Date,'now',()=>now);
+  const app=(await harness(t,{settings,fetchModel:async()=>{calls++;now+=181000;return modelResponseWithLength();}})).client();
+  const response=await app.generate('ai');assert.equal(response.status,502);
+  assert.equal((await response.json()).code,'MODEL_TRUNCATED');assert.equal(calls,1);
+});
+
 test('a JSON number from the model becomes a private reference and can be checked without another AI call',async t=>{
   let calls=0;const parameters={...config,topic:'algebra'};
   const numeric={...reference,question:'Вычисли сумму 2 + 3.',answer:5,explanation:'2 + 3 = 5.'};

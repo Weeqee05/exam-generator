@@ -1,6 +1,6 @@
 import * as http from 'node:http';
 import {readFile} from 'node:fs/promises';
-import {RequestError, readLimited} from './errors.mjs';
+import {RequestError, readLimited, truncatedModel} from './errors.mjs';
 
 const SHARELLM_BASE_URL = 'https://sharellm.net/v1';
 const SHARELLM_MODEL = 'qwen3.8-27b';
@@ -103,7 +103,7 @@ export function configureRuntimeProxy(settings = process.env) {
 // Qwen sends reasoning and final-answer deltas in separate SSE fields. Only
 // final text reaches the existing JSON validator and the browser.
 async function readStreamedChoice(stream) {
-  const invalid = () => new RequestError(502, 'Модель вернула неполный или неверный вариант. Попробуй ещё раз.');
+  const invalid = () => new RequestError(502, 'Поток ответа ИИ оборвался или имеет неверный формат. Попробуй ещё раз.','MODEL_STREAM_INVALID');
   if (!stream) throw invalid();
   const decoder = new TextDecoder('utf-8', {fatal: true});
   const parts = [];
@@ -121,7 +121,7 @@ async function readStreamedChoice(stream) {
     if (!data.choices.length) return; // Usage-only events can have an empty choices array.
     const choice = data.choices[0];
     if (!choice || typeof choice !== 'object' || Array.isArray(choice) || (choice.delta != null && (typeof choice.delta !== 'object' || Array.isArray(choice.delta)))) throw invalid();
-    if (choice.finish_reason === 'length') throw invalid();
+    if (choice.finish_reason === 'length') throw truncatedModel();
     if (choice.finish_reason != null) {
       if (typeof choice.finish_reason !== 'string') throw invalid();
       finishReason = choice.finish_reason;
@@ -159,7 +159,7 @@ async function readStreamedChoice(stream) {
   try {
     for await (const chunk of stream) {
       rawBytes += chunk.byteLength;
-      if (rawBytes > 2 * 1024 * 1024) throw new RequestError(413, 'Слишком большой запрос или ответ модели.');
+      if (rawBytes > 8 * 1024 * 1024) throw new RequestError(413, 'Слишком большой запрос или ответ модели.');
       feed(decoder.decode(chunk, {stream: true}));
       if (done) break;
     }
@@ -169,7 +169,8 @@ async function readStreamedChoice(stream) {
     throw invalid();
   }
   const content = parts.join('');
-  if (!done || !content.trim()) throw invalid();
+  if (!done) throw invalid();
+  if (!content.trim()) throw new RequestError(502,'Сервис ИИ завершил запрос без результата. Попробуй позже или выбери другую модель.','MODEL_EMPTY');
   return {message: {content}, finish_reason: finishReason};
 }
 
@@ -188,7 +189,10 @@ export function createModelClient(settings, fetchModel = globalThis.fetch) {
       response = await fetchModel(endpoint, {
         method: 'POST', headers: {'Content-Type': 'application/json', Authorization: `Bearer ${key}`},
         signal: AbortSignal.timeout(timeoutMs), redirect: 'error',
-        body: JSON.stringify({model, stream, messages, response_format: {type: 'json_object'}, max_tokens: maxTokens})
+        // Qwen counts private reasoning against max_tokens too. Reserve space
+        // for it instead of cutting the response off before the final JSON.
+        body: JSON.stringify({model, stream, messages, response_format: {type: 'json_object'},
+          max_tokens: stream ? Math.min(32768,maxTokens+16384) : maxTokens})
       });
     } catch (error) {
       if (['TimeoutError', 'AbortError'].includes(error.name)) throw error;
@@ -216,17 +220,17 @@ export function createModelClient(settings, fetchModel = globalThis.fetch) {
     else {
       const raw = response.body ? await readLimited(response.body, 200000) : '';
       try { choice = JSON.parse(raw).choices?.[0]; } catch {
-        throw new RequestError(502, 'Модель вернула неполный или неверный ответ. Попробуй ещё раз.');
+        throw new RequestError(502, 'Сервис ИИ вернул неверный формат ответа. Попробуй ещё раз.','MODEL_PROTOCOL_INVALID');
       }
     }
+    if (choice?.finish_reason === 'length') throw truncatedModel();
+    const content = choice?.message?.content;
+    if (typeof content !== 'string' || !content.trim()) throw new RequestError(502,'Сервис ИИ завершил запрос без результата. Попробуй позже или выбери другую модель.','MODEL_EMPTY');
     try {
-      if (choice?.finish_reason === 'length') throw new Error('Incomplete model output');
-      const content = choice?.message?.content;
-      if (typeof content !== 'string') throw new Error('Missing model text');
       // Accept a complete fenced JSON block from compatible gateways, never code.
       const json = content.trim().replace(/^\x60\x60\x60(?:json)?\s*([\s\S]*?)\s*\x60\x60\x60$/i, '$1');
       return JSON.parse(json);
-    } catch { throw new RequestError(502, 'Модель вернула неполный или неверный ответ. Попробуй ещё раз.'); }
+    } catch { throw new RequestError(502, 'ИИ не соблюл формат JSON. Попробуй ещё раз.','MODEL_JSON_INVALID'); }
   }
   return {ready, ask};
 }

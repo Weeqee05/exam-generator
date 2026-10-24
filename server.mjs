@@ -2,6 +2,7 @@ import * as http from 'node:http';
 import {readFile} from 'node:fs/promises';
 import {randomBytes} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
+import packageInfo from './package.json' with {type:'json'};
 import {validConfig, hasTemplates, makeTasks} from './dist/generator.mjs';
 import {validateModelResult} from './dist/ai.mjs';
 import {plainText} from './dist/export.mjs';
@@ -19,7 +20,7 @@ import {directAction, feedbackParagraphs, feedbackMethod} from './dist/dialogue.
 export {loadProviderSettings, configureRuntimeProxy};
 
 const assets = new Map([['/', ['index.html', 'text/html']], ['/index.html', ['index.html', 'text/html']], ['/styles.css', ['styles.css', 'text/css']], ...['app', 'generator', 'ai', 'export', 'dialogue', 'format', 'vendor/katex/katex'].map(name => [`/${name}.mjs`, [`${name}.mjs`, 'text/javascript']]), ['/vendor/katex/katex.min.css',['vendor/katex/katex.min.css','text/css']]]);
-const headers = {'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'same-origin', 'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"};
+const headers = {'X-App-Version':packageInfo.version,'X-Content-Type-Options': 'nosniff', 'Referrer-Policy': 'same-origin', 'Content-Security-Policy': "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"};
 const SESSION_COOKIE = 'praktikum_session';
 
 function checkOrigin(req) {
@@ -109,13 +110,20 @@ export function createApp({settings = process.env, fetchModel = globalThis.fetch
     let tasks;
     if (source === 'ai') {
       let result;
-      // Leave room for longer variants without reserving a large answer for a
-      // single task. Reasoning stays enabled; incomplete output is still rejected.
       const maxTokens = Math.min(8000, 1536 + config.count * 512);
-      try { result = validateModelResult(await ask(req, model, generationMessages(config, number, similarQuestion), maxTokens), config); }
-      catch (error) {
-        if (error instanceof RequestError || ['TimeoutError', 'AbortError'].includes(error.name)) throw error;
-        throw new RequestError(502, 'Модель вернула неполный или неверный вариант. Попробуй ещё раз.');
+      const recoverable = new Set(['MODEL_TRUNCATED','MODEL_STREAM_INVALID','MODEL_EMPTY','MODEL_JSON_INVALID','MODEL_PROTOCOL_INVALID','MODEL_VARIANT_INVALID']);
+      // One bounded retry stays inside the original request deadline. It never
+      // changes provider or stores an unfinished variant in the student's history.
+      for(let attempt=0;attempt<2;attempt++) {
+        try {
+          const raw=await ask(req,model,generationMessages(config,number,similarQuestion,attempt>0),attempt ? Math.min(8000,maxTokens*2) : maxTokens);
+          try {result=validateModelResult(raw,config);}
+          catch {throw new RequestError(502,'ИИ не заполнил все задания в нужном формате. Попробуй меньше заданий или другую модель.','MODEL_VARIANT_INVALID');}
+          break;
+        } catch(error) {
+          if(attempt===0 && recoverable.has(error.code) && req.assistantDeadline-Date.now()>=60000) continue;
+          throw error;
+        }
       }
       tasks = result.tasks.map(task => ({tag: task.type, ...Object.fromEntries(['question', 'hint', 'answer', 'explanation'].map(key => [key, task[key]]))}));
       if (similarQuestion && tasks[0].question.replace(/\s+/g, ' ').trim().toLocaleLowerCase('ru-RU') === similarQuestion.replace(/\s+/g, ' ').trim().toLocaleLowerCase('ru-RU')) {
@@ -272,7 +280,7 @@ export function createApp({settings = process.env, fetchModel = globalThis.fetch
     } catch (error) {
       if (res.destroyed || res.writableEnded) return;
       const timedOut = ['TimeoutError', 'AbortError'].includes(error.name);
-      send(res, error.status || (timedOut ? 504 : 500), {error: error.status ? error.message : timedOut ? 'Модель отвечает слишком долго. Попробуй ещё раз.' : 'Не удалось выполнить запрос. Попробуй позже.'});
+      send(res, error.status || (timedOut ? 504 : 500), {error: error.status ? error.message : timedOut ? 'Модель отвечает слишком долго. Попробуй ещё раз.' : 'Не удалось выполнить запрос. Попробуй позже.',...(error instanceof RequestError && error.code ? {code:error.code} : {})});
     }
   });
   server.requestTimeout = 60000;

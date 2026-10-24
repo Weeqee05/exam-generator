@@ -5,10 +5,13 @@ import {createApp, configureRuntimeProxy, loadProviderSettings} from '../server.
 import {createModelRegistry} from '../server/provider.mjs';
 
 // Explicit paid integration check. Never run from npm test or on page load.
-// At most four model calls: generation, intent, written-answer grading, question.
+// At most five model calls, including one possible generation-format retry.
 const settings = await loadProviderSettings();
 const registry = createModelRegistry(settings);
 const provider = process.argv[2] || registry.defaultProvider;
+const config=process.argv.includes('--limits')
+  ? {topic:'custom',customTopic:'Пределы функций',level:'medium',count:3}
+  : {topic:'complex',level:'easy',count:1};
 if (!registry.get(provider)?.ready) {
   console.error('Выбранная модель не настроена. Добавь её серверный ключ перед настоящей проверкой.');
   process.exitCode = 1;
@@ -52,10 +55,10 @@ if (!registry.get(provider)?.ready) {
     return result;
   }
   try {
-    const {variant} = await api('/api/generate', {config: {topic: 'complex', level: 'easy', count: 1}, variantId: 1, source: 'ai'});
-    assert.equal(variant.config.topic, 'complex');
+    const {variant} = await api('/api/generate', {config, variantId: 1, source: 'ai'});
+    assert.deepEqual(variant.config,config);
     assert.equal(variant.source, 'ai');
-    assert.equal(variant.tasks.length, 1);
+    assert.equal(variant.tasks.length, config.count);
     const task = variant.tasks[0];
     assert.ok(task.id && task.question?.trim());
     for (const name of ['answer', 'explanation', 'proof', 'hint']) assert.ok(!Object.hasOwn(task, name));
