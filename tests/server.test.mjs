@@ -15,7 +15,7 @@ const config={topic:'complex',level:'easy',count:1};
 const result={topic:'complex',difficulty:'easy',tasks:[{type:'Сложение',question:'Найди 1 + i + 2 + i.',hint:'Сложи действительные части.',answer:'3 + 2i',explanation:'1 + 2 = 3, i + i = 2i.'}]};
 const settings={LLM_API_KEY:'test-only-not-a-real-key',LLM_MODEL:'test-model',LLM_BASE_URL:'https://example.invalid/v1'};
 const answer=(data=result)=>new Response(JSON.stringify({choices:[{message:{content:JSON.stringify(data)}}]}),{headers:{'Content-Type':'application/json'}});
-const qwenSettings={LLM_API_KEY:'test-only-not-a-real-key'};
+const qwenSettings={LLM_API_KEY:'test-only-not-a-real-key',LLM_BASE_URL:'https://sharellm.net/v1',LLM_MODEL:'qwen3.8-flash'};
 const event=(data,ending='\n')=>'data: '+JSON.stringify(data)+ending+ending;
 const textEvent=(content,finish_reason=null)=>event({choices:[{delta:{content},finish_reason}]});
 function streamed(chunks) {
@@ -134,14 +134,14 @@ test('provider failures are useful and never leak credentials or provider respon
   });
 });
 
-test('ShareLLM defaults use the verified model and only require the server key',async t=>{
+test('Gemini defaults only require a server key and custom providers require a model',async t=>{
   let received;
   const app=await running(t,{settings:{LLM_API_KEY:'test-only-not-a-real-key'},fetchModel:async(url,init)=>{received={url,init};return answer();}});
   assert.deepEqual(await(await app.get('/api/status')).json(),{aiAvailable:true});
   assert.equal((await app.post()).status,200);
-  assert.equal(received.url,'https://sharellm.net/v1/chat/completions');
-  assert.equal(JSON.parse(received.init.body).model,'qwen3.8-flash');
-  assert.equal(JSON.parse(received.init.body).stream,true); // Compatible gateways may still return ordinary JSON.
+  assert.equal(received.url,'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions');
+  assert.equal(JSON.parse(received.init.body).model,'gemini-3.1-flash-lite');
+  assert.equal(JSON.parse(received.init.body).stream,false);
   const custom=await running(t,{settings:{LLM_API_KEY:'test-only',LLM_BASE_URL:'https://example.invalid/v1'}});
   assert.deepEqual(await(await custom.get('/api/status')).json(),{aiAvailable:false});
 });
@@ -234,6 +234,22 @@ test('imported New API connection works with a root URL and overrides incorrect 
   assert.equal(loaded.HOST,'127.0.0.1');
   assert.deepEqual(await loadProviderSettings(settings,join(folder,'missing.json')),settings);
   assert.equal((await app.get('/.env.connection.json')).status,404);
+});
+
+test('imported Gemini connection selects its default model and stays server-only',async t=>{
+  const folder=await mkdtemp(join(tmpdir(),'gemini-connection-'));
+  t.after(()=>rm(folder,{recursive:true,force:true}));
+  const path=join(folder,'.env.connection.json');
+  await writeFile(path,JSON.stringify({_type:'newapi_channel_conn',url:'https://generativelanguage.googleapis.com/v1beta/openai/',key:'gemini-test-key'}));
+  const loaded=await loadProviderSettings({...settings,LLM_MODEL:'old-provider-model'},path);
+  let received;
+  const app=await running(t,{settings:loaded,fetchModel:async(url,init)=>{received={url,init};return answer();}});
+  const response=await app.post();assert.equal(response.status,200);
+  const data=await response.json();assertPublicVariant(data,result);
+  assert.equal(received.url,'https://generativelanguage.googleapis.com/v1beta/openai/chat/completions');
+  assert.equal(JSON.parse(received.init.body).model,'gemini-3.1-flash-lite');
+  assert.equal(received.init.headers.Authorization,'Bearer gemini-test-key');
+  assert.ok(!JSON.stringify(data).includes('gemini-test-key'));
 });
 
 test('invalid imported connections fail without exposing their contents',async t=>{

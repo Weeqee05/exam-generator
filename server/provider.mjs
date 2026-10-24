@@ -4,6 +4,13 @@ import {RequestError, readLimited} from './errors.mjs';
 
 const SHARELLM_BASE_URL = 'https://sharellm.net/v1';
 const SHARELLM_MODEL = 'qwen3.8-flash';
+const DEFAULT_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/openai';
+const DEFAULT_MODEL = 'gemini-3.1-flash-lite';
+
+function defaultModel(base) {
+  if (base === DEFAULT_BASE_URL) return DEFAULT_MODEL;
+  if (base === SHARELLM_BASE_URL) return SHARELLM_MODEL;
+}
 
 function normalizeBase(value) {
   if (typeof value !== 'string') return;
@@ -35,7 +42,7 @@ export async function loadProviderSettings(settings = process.env, path = new UR
     ...settings,
     LLM_API_KEY: connection.key.trim(),
     LLM_BASE_URL: base,
-    LLM_MODEL: connection.model?.trim() || (base === SHARELLM_BASE_URL ? SHARELLM_MODEL : settings.LLM_MODEL)
+    LLM_MODEL: connection.model?.trim() || defaultModel(base) || settings.LLM_MODEL
   };
 }
 
@@ -125,8 +132,8 @@ async function readStreamedChoice(stream) {
 // One provider adapter is shared by generation, checking and the tutor chat.
 export function createModelClient(settings, fetchModel = globalThis.fetch) {
   const key = settings.LLM_API_KEY?.trim();
-  const base = normalizeBase(settings.LLM_BASE_URL?.trim() || SHARELLM_BASE_URL);
-  const model = settings.LLM_MODEL?.trim() || (base === SHARELLM_BASE_URL ? SHARELLM_MODEL : undefined);
+  const base = normalizeBase(settings.LLM_BASE_URL?.trim() || DEFAULT_BASE_URL);
+  const model = settings.LLM_MODEL?.trim() || defaultModel(base);
   const endpoint = base && base + '/chat/completions';
   const stream = base === SHARELLM_BASE_URL && model === SHARELLM_MODEL;
   const ready = Boolean(key && model && endpoint);
