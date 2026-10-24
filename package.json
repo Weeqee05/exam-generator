@@ -10,7 +10,6 @@
   "scripts": {
     "dev": "node --env-file-if-exists=.env server.mjs",
     "start": "node --env-file-if-exists=.env server.mjs",
-    "export:offline": "node scripts/export-offline.mjs",
     "test": "node tests/verify.mjs && node --test tests/*.test.mjs",
     "test:browser": "node scripts/verify-browser.mjs",
     "test:llm": "node --env-file-if-exists=.env scripts/verify-provider.mjs"

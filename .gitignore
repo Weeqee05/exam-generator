@@ -11,9 +11,4 @@ Thumbs.db
 *.log
 .openai/
 .codex/
-downloads/*
-!downloads/praktikum.html
-!downloads/praktikum.zip
-!downloads/KAK-OTKRYT.txt
-!downloads/praktikum-desktop.png
-!downloads/praktikum-mobile.png
+downloads/
