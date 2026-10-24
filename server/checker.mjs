@@ -234,6 +234,42 @@ function comparePair(expected, input) {
   return result(matches === 2 ? 'correct' : matches ? 'partial' : 'incorrect', 'Запиши оба результата в порядке из условия и проверь каждую часть отдельно.', matches === 1 ? 'Одна часть ответа верна; проверь вторую.' : 'Не совпадают результаты составного ответа.');
 }
 
+// A short, explicit table keeps unit checking explainable at the defence.
+// Unknown units, compound answers and written derivations still go to the model.
+const units = new Map();
+for (const [aliases, dimension, factor] of [
+  [['мм','mm'],'length',0.001], [['см','cm'],'length',0.01], [['м','m'],'length',1], [['км','km'],'length',1000],
+  [['мс','ms'],'time',0.001], [['с','s'],'time',1], [['мин','min'],'time',60], [['ч','h'],'time',3600],
+  [['мг','mg'],'mass',0.000001], [['г','g'],'mass',0.001], [['кг','kg'],'mass',1],
+  [['м/с','m/s'],'speed',1], [['км/ч','km/h'],'speed',1/3.6]
+]) for (const alias of aliases) units.set(alias,{dimension,factor});
+const unitNames = [...units.keys()].sort((a,b)=>b.length-a.length);
+const uncertainParts = input => /[?≈]|(?<!\p{L})(?:или|либо)(?!\p{L})/iu.test(input)
+  ? input.split(/[?≈]|(?<!\p{L})(?:или|либо)(?!\p{L})/iu).map(part=>part.trim()).filter(Boolean) : [];
+function quantity(text) {
+  const value=text.trim();
+  const unit=unitNames.find(name=>value.endsWith(name));
+  if (!unit) return null;
+  const number=expression(value.slice(0,-unit.length).trim());
+  if (!number || !isReal(number)) return null;
+  const {dimension,factor}=units.get(unit), normalized=number[0]*factor;
+  if (!Number.isFinite(normalized) || Math.abs(normalized)>Number.MAX_SAFE_INTEGER || (number[0]!==0 && normalized===0)) return null;
+  return {dimension,value:normalized};
+}
+function compareQuantity(reference, input) {
+  const expected=quantity(reference);
+  if (!expected) return null;
+  if (uncertainParts(input).some(part=>quantity(part)||expression(part))) return result('clarify','Укажи одно значение вместе с единицей измерения.');
+  const actual=quantity(input);
+  if (!actual) {
+    if (expression(input)) return {...result('clarify',''),explanation:'В каких единицах записан твой результат?'};
+    return null;
+  }
+  if (expected.dimension!==actual.dimension) return result('incorrect','Проверь, какую физическую величину нужно найти и в каких единицах она измеряется.','Единица измерения относится к другой физической величине.');
+  if (close(expected.value,actual.value)) return {...result('correct',''),explanation:'Значения совпадают после перевода в одинаковые единицы измерения.'};
+  return result('incorrect','Приведи значения к одной единице и проверь вычисления.','После перевода единиц значения не совпадают.');
+}
+
 // Expected values of template tasks are recomputed from the task parameters.
 // This does not execute either the displayed Python program or a student's code.
 function localExpected(proof) {
@@ -273,7 +309,7 @@ function localExpected(proof) {
 export function checkDeterministic(task, answer) {
   if (typeof answer !== 'string' || !answer.trim()) return result('clarify', 'Введи свой ответ: число, комплексное число, множество или результат программы.');
   if (!task || typeof task.answer !== 'string' || answer.length > MAX_INPUT) return null;
-  const input = answer.trim().replace(/^(?:ответ\s*[:=]|[xz]\s*=)\s*/iu, '');
+  const input = answer.trim().replace(/^(?:(?:мой\s+)?ответ(?:\s*[:=]\s*|\s+)|[xzsvtlm]\s*=\s*|(?:я\s+получил[а]?|получилось)(?:\s*[:=]\s*|\s+))/iu, '');
   let expected = localExpected(task.proof);
   // A proof requiring reasoning must not turn into a false positive based on
   // matching a few numbers occurring in its reference explanation.
@@ -285,6 +321,8 @@ export function checkDeterministic(task, answer) {
     const reasoning = /докаж|доказы|обосну|обоснов|объясн|поясн|аргументир|почему|проанализир|прокомментир|prove|justify|explain|demonstrate|show\s+(?:your\s+)?work/iu;
     const multipleParts = /(?:найди|вычисли|определи|запиши|укажи|перечисли|сравни|построй|реши)[\s\S]*\sи\s/iu;
     if (reasoning.test(question) || multipleParts.test(question)) return null;
+    const measured=compareQuantity(task.answer,input);
+    if (measured) return measured;
     const pythonOutput = /python|программ|список|списка|кортеж|вывед/iu.test(question);
     if (pythonOutput && /^[[(]/.test(task.answer.trim())) {
       const sequence = numericSequence(task.answer);
@@ -299,7 +337,7 @@ export function checkDeterministic(task, answer) {
       else return null;
     }
   }
-  if (/(?<!\p{L})(?:или|либо)(?!\p{L})|[?≈]/iu.test(input)) return result('clarify', 'Укажи один окончательный ответ. Если результат составной, явно подпиши его части.');
   const compare = {complex:compareComplex,set:compareSet,sequence:compareSequence,pair:comparePair}[expected.type];
+  if (uncertainParts(input).some(part=>compare(expected.value,part))) return result('clarify', 'Укажи один окончательный ответ. Если результат составной, явно подпиши его части.');
   return compare(expected.value,input);
 }

@@ -1,4 +1,4 @@
-import {feedbackParagraphs} from './dialogue.mjs';
+import {feedbackParagraphs, feedbackMethod} from './dialogue.mjs';
 import {TOPICS, LEVELS, validConfig, hasTemplates, topicName, escapeHtml} from './generator.mjs';
 
 // Only the selected variant id and the student's drafts are persisted here.
@@ -40,11 +40,12 @@ export function mountApp(doc, storage, env = {}) {
   let current = null, history = [], selectedTaskId = null, busy = false, aiAvailable = false;
   let providers = [], activeProvider = saved.preferredProvider || 'gemini';
   let toastTimer, storageWarned = false;
-  const conversations = new Map(), solutions = new Map();
+  const conversations = new Map(), solutions = new Map(), selections = new Map();
   $('topic').innerHTML = Object.entries(TOPICS).map(([id, topic]) => `<option value="${id}">${escapeHtml(topic.name)}</option>`).join('');
   const icon = name => `<svg aria-hidden="true"><use href="#i-${name}"/></svg>`;
   const selectedTask = () => current?.tasks.find(task => task.id === selectedTaskId);
   const taskPath = action => '/api/tasks/' + encodeURIComponent(selectedTaskId) + '/' + action;
+  const scrollBehavior = () => doc.defaultView?.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches ? 'auto' : 'smooth';
 
   function toast(text) {
     $('toast').textContent = text; $('toast').hidden = false;
@@ -65,8 +66,14 @@ export function mountApp(doc, storage, env = {}) {
   }
   async function api(path, data) {
     const options = {credentials:'same-origin', signal:AbortSignal.timeout(data === undefined ? 10000 : 250000)};
-    if (data !== undefined) Object.assign(options, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...data,provider:data.provider ?? activeProvider})});
-    const response = await request(path, options), result = await response.json();
+    if (data !== undefined) Object.assign(options, {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({...data,provider:(data.provider ?? activeProvider) || null})});
+    const response = await request(path, options);
+    let result;
+    try {result = await response.json();}
+    catch {
+      if (response.ok) throw new Error('Сервер вернул непонятный ответ. Попробуй ещё раз.');
+      throw new Error(`Сервер временно недоступен (HTTP ${response.status}). Подожди и повтори попытку.`);
+    }
     if (!response.ok) {const error = new Error(result.error || 'Не удалось выполнить запрос.'); error.status = response.status; throw error;}
     return result;
   }
@@ -127,8 +134,8 @@ export function mountApp(doc, storage, env = {}) {
   function updateProviderState() {
     const any = providers.some(item => item.available);
     for (const id of ['provider','chat-provider']) $(id).disabled = busy || !any;
-    $('provider-status').textContent = any ? 'Для ответов и общения в этом диалоге.' : 'Добавь ключ Gemini или Qwen в настройки сервера.';
-    $('provider-note').textContent = $('provider').value === 'qwen' ? 'Qwen может отвечать дольше. Выбор применяется к новым заданиям.' : 'Gemini создаёт задания и помогает разбирать решения.';
+    $('provider-status').textContent = any ? activeProvider === '' ? 'Список моделей временно недоступен. Используется основная модель сервера.' : 'Для ответов и общения в этом диалоге.' : 'Добавь ключ Gemini или Qwen в настройки сервера.';
+    $('provider-note').textContent = $('provider').value === '' ? 'Используется основная модель сервера. Обнови страницу, чтобы загрузить список.' : $('provider').value === 'qwen' ? 'Qwen может отвечать дольше. Выбор применяется к новым заданиям.' : 'Gemini создаёт задания и помогает разбирать решения.';
   }
   function setProvider(id) {
     if (busy || !providers.some(item => item.id === id && item.available)) return;
@@ -163,7 +170,7 @@ export function mountApp(doc, storage, env = {}) {
       if (item.kind === 'feedback') {
         const f=item.feedback; css=' verdict-'+f.verdict;
         const paragraphs = feedbackParagraphs(f);
-        body=`<span class="verdict-label">${labels[f.verdict]}</span>${paragraphs.map(text=>`<p>${escapeHtml(text)}</p>`).join('')}<span class="feedback-method">${f.method==='code'?'Проверено вычислением':f.method==='ai'?'Оценка ИИ — она может ошибаться':'Нужно уточнение для точной проверки'}</span>`;
+        body=`<span class="verdict-label">${labels[f.verdict]}</span>${paragraphs.map(text=>`<p>${escapeHtml(text)}</p>`).join('')}<span class="feedback-method">${feedbackMethod(f)}</span>`;
       } else if (item.kind === 'solution') {
         css=' solution-content'; body=`<strong>Ответ</strong><div class="solution-answer">${escapeHtml(item.solution.answer)}</div><strong>Разбор по шагам</strong><div class="solution-explanation">${escapeHtml(item.solution.explanation)}</div>`;
       } else body=escapeHtml(item.content);
@@ -183,13 +190,17 @@ export function mountApp(doc, storage, env = {}) {
   }
   function acceptVariant(value, restoring = false) {
     current=publicVariant(value);history=[current,...history.filter(v=>v.id!==current.id)].slice(0,20);
-    selectedTaskId=restoring && current.tasks.some(t=>t.id===saved.selectedTaskId) ? saved.selectedTaskId : current.tasks[0].id;
+    const preferredTask=restoring ? saved.selectedTaskId : selections.get(current.id);
+    selectedTaskId=current.tasks.some(t=>t.id===preferredTask) ? preferredTask : current.tasks[0].id;
+    selections.set(current.id,selectedTaskId);
     $('topic').value=current.config.topic;$('count').value=current.config.count;
     $('custom-topic').value=current.config.customTopic || '';
     for(const input of doc.querySelectorAll('input[name="level"]'))input.checked=input.value===current.config.level;
     render();persist();
+    $('app-error').hidden=true;
     const validTasks=new Set(history.flatMap(v=>v.tasks.map(t=>t.id)));
     for(const map of [conversations,solutions]) for(const id of map.keys())if(!validTasks.has(id))map.delete(id);
+    for(const id of selections.keys())if(!history.some(v=>v.id===id))selections.delete(id);
   }
   async function generate() {
     if(busy)return false;
@@ -210,13 +221,21 @@ export function mountApp(doc, storage, env = {}) {
   }
   async function loadVariant(id) {
     if(busy)return false;saveDraft();setBusy(true,'Открываем занятие…');
-    try{acceptVariant((await api('/api/variants/'+encodeURIComponent(id))).variant);$('history-dialog').close();return true;}
+    try{
+      const variant=publicVariant((await api('/api/variants/'+encodeURIComponent(id))).variant);
+      // Reload public conversation from the server, including another tab's work.
+      for(const task of variant.tasks){
+        conversations.set(task.id,task.chat.map(item=>({...item,kind:'text'})));
+        if(solutions.has(task.id)) conversations.get(task.id).push({role:'assistant',kind:'solution',solution:solutions.get(task.id)});
+      }
+      acceptVariant(variant);$('history-dialog').close();return true;
+    }
     catch(error){$('history-dialog').close();$('app-error').textContent=errorText(error);$('app-error').hidden=false;return false;}
     finally{setBusy(false);}
   }
   function selectTask(id) {
     if(busy || !current?.tasks.some(t=>t.id===id))return;
-    saveDraft();selectedTaskId=id;render();persist();
+    saveDraft();selectedTaskId=id;selections.set(current.id,id);render();persist();
   }
   function showHistory() {
     if(busy)return;$('history-search').value='';renderHistory();$('history-dialog').showModal();
@@ -235,7 +254,11 @@ export function mountApp(doc, storage, env = {}) {
     try {
       const result=await api(taskPath('respond'),{message:text});
       if(!['feedback','message','solution','variant'].includes(result.kind))throw new Error('Не удалось понять ответ ассистента. Попробуй ещё раз.');
-      if(result.kind==='variant') {acceptVariant(result.variant);return;}
+      if(result.kind==='variant') {
+        // The command was submitted successfully; it is no longer a draft.
+        const next=publicVariant(result.variant);
+        delete saved.drafts[task.id];acceptVariant(next);return;
+      }
       let reply;
       if(result.kind==='feedback') {
         if(!Object.hasOwn(labels,result.verdict))throw new Error('Не удалось понять оценку ответа. Попробуй ещё раз.');
@@ -252,7 +275,7 @@ export function mountApp(doc, storage, env = {}) {
       conversationFor(task).push({role:'user',content:text,kind:'text'},reply);
       delete saved.drafts[task.id];persist();$('chat-input').value='';
       renderMessages();updateProgress();
-      $('chat-messages').lastElementChild?.scrollIntoView({behavior:'smooth',block:'nearest'});
+      $('chat-messages').lastElementChild?.scrollIntoView({behavior:scrollBehavior(),block:'nearest'});
     } catch(error){$('chat-error').textContent=errorText(error);$('chat-error').hidden=false;}
     finally{setBusy(false);$('chat-input').focus({preventScroll:true});}
   }
@@ -261,7 +284,7 @@ export function mountApp(doc, storage, env = {}) {
     saveDraft();$('chat-error').hidden=true;
     const task=selectedTask();
     if(action==='solution' && solutions.has(task.id)){
-      doc.querySelector('.solution-content')?.scrollIntoView({behavior:'smooth',block:'center'});return;
+      doc.querySelector('.solution-content')?.scrollIntoView({behavior:scrollBehavior(),block:'center'});return;
     }
     const caption={hint:'Дай подсказку',simpler:'Объясни проще',solution:'Покажи решение',similar:'Дай похожее задание'}[action];
     if(!caption)return;
@@ -278,7 +301,7 @@ export function mountApp(doc, storage, env = {}) {
         reply={role:'assistant',kind:'text',content:result.message};
       }
       conversationFor(task).push({role:'user',content:caption,kind:'text'},reply);renderMessages();
-      $('chat-messages').lastElementChild?.scrollIntoView({behavior:'smooth',block:'nearest'});
+      $('chat-messages').lastElementChild?.scrollIntoView({behavior:scrollBehavior(),block:'nearest'});
     } catch(error){$('chat-error').textContent=errorText(error);$('chat-error').hidden=false;}
     finally{setBusy(false);}
   }
@@ -309,7 +332,7 @@ export function mountApp(doc, storage, env = {}) {
   $('history-search').addEventListener('input',renderHistory);
   $('history-list').addEventListener('click',event=>{const button=event.target.closest('[data-load]');if(button)return loadVariant(button.dataset.load);});
   for(const id of ['rail-guide','rail-help','footer-guide'])$(id).addEventListener('click',()=>$('guide-dialog').showModal());
-  for(const id of ['nav-generator','rail-practice'])$(id).addEventListener('click',()=>$('conversation-title').scrollIntoView({behavior:'smooth',block:'start'}));
+  for(const id of ['nav-generator','rail-practice'])$(id).addEventListener('click',()=>$('conversation-title').scrollIntoView({behavior:scrollBehavior(),block:'start'}));
   for(const button of doc.querySelectorAll('[data-close]'))button.addEventListener('click',()=>button.closest('dialog').close());
   for(const dialog of doc.querySelectorAll('dialog')){
     // Closing a dialog does not unlock or duplicate its pending request.
@@ -327,7 +350,10 @@ export function mountApp(doc, storage, env = {}) {
     if(results[2].status==='fulfilled' && Array.isArray(results[2].value.providers)) {
       providers=results[2].value.providers.filter(item=>['gemini','qwen','default'].includes(item.id));
       activeProvider=providers.find(item=>item.id===saved.preferredProvider&&item.available)?.id || providers.find(item=>item.id===results[2].value.defaultProvider&&item.available)?.id || providers.find(item=>item.available)?.id || results[2].value.defaultProvider;
-    } else providers=[{id:'gemini',label:'Gemini',available:aiAvailable},{id:'qwen',label:'Qwen',available:false}];
+    } else {
+      // A failed metadata request must not guess which provider has a key.
+      providers=[{id:'',label:'Основная модель сервера',available:aiAvailable}];activeProvider='';
+    }
     for(const id of ['provider','chat-provider']) {
       $(id).innerHTML=providers.map(item=>`<option value="${escapeHtml(item.id)}" ${item.available?'':'disabled'}>${escapeHtml(item.label)}${item.available?'':' — не подключён'}</option>`).join('');
       $(id).value=activeProvider;

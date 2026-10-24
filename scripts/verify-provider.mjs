@@ -5,7 +5,7 @@ import {createApp, configureRuntimeProxy, loadProviderSettings} from '../server.
 import {createModelRegistry} from '../server/provider.mjs';
 
 // Explicit paid integration check. Never run from npm test or on page load.
-// Three model operations: generation, written-answer grading, and tutoring chat.
+// At most four model calls: generation, intent, written-answer grading, question.
 const settings = await loadProviderSettings();
 const registry = createModelRegistry(settings);
 const provider = process.argv[2] || registry.defaultProvider;
@@ -66,11 +66,13 @@ if (!registry.get(provider)?.ready) {
     console.log('Ответ после явного запроса:', solution.answer);
     console.log('Решение:', solution.explanation);
     // A written derivation deliberately exercises AI grading, not numeric matching.
-    const feedback = await api(`/api/tasks/${task.id}/check`, {answer: `Моё решение по шагам:\n${solution.explanation}\nМой итоговый ответ: ${solution.answer}`});
+    const feedback = await api(`/api/tasks/${task.id}/respond`, {message: `Моё решение по шагам:\n${solution.explanation}\nМой итоговый ответ: ${solution.answer}`});
+    assert.equal(feedback.kind, 'feedback', 'Развёрнутая попытка должна распознаваться как ответ.');
     assert.equal(feedback.method, 'ai', 'Ожидалась настоящая проверка развёрнутого решения моделью.');
     assert.equal(feedback.verdict, 'correct', 'Модель не подтвердила собственное эталонное решение.');
     console.log('PASS: реальная ИИ-проверка развёрнутого ответа:', feedback.explanation);
-    const chat = await api(`/api/tasks/${task.id}/chat`, {message: 'Как выбрать метод для этого задания? Объясни первый шаг, без итогового ответа.'});
+    const chat = await api(`/api/tasks/${task.id}/respond`, {message: 'Как выбрать метод для этого задания? Объясни первый шаг, без итогового ответа.'});
+    assert.equal(chat.kind, 'message', 'Вопрос должен получить объяснение, а не оценку.');
     assert.ok(typeof chat.message === 'string' && chat.message.trim());
     console.log('PASS: реальный ответ ассистента по текущему заданию:', chat.message);
     console.log('Время операций:', JSON.stringify(operations));

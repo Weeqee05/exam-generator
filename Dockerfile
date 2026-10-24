@@ -7,4 +7,4 @@ COPY --chown=node:node prompts ./prompts
 USER node
 ENV HOST=0.0.0.0 PORT=8000
 EXPOSE 8000
-CMD ["node", "server.mjs"]
+CMD ["node", "--env-file-if-exists=.env", "server.mjs"]

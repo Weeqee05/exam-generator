@@ -42,6 +42,61 @@ function publicOnly(variant) {
   }
 }
 
+test('a question without an AI key receives guidance rather than a missing-answer grade',async t=>{
+  const app=(await harness(t)).client();const {variant}=await(await app.generate()).json();
+  const result=await(await app.action(variant.tasks[0].id,'respond',{message:'Как начать решение?'})).json();
+  assert.equal(result.kind,'message');assert.ok(!Object.hasOwn(result,'verdict'));assert.match(result.message,/подключённая модель/);
+});
+
+test('physics responses compare equivalent units without spending extra model calls',async t=>{
+  let calls=0;
+  const parameters={...config,topic:'physics'};
+  const measured={...reference,question:'Найди длину отрезка в метрах.',answer:'2 м',hint:'В одном метре сто сантиметров.',explanation:'Длина отрезка равна двум метрам.'};
+  const app=(await harness(t,{settings,fetchModel:async()=>{calls++;return modelResponse(generated([measured],parameters));}})).client();
+  const {variant}=await(await app.generate('ai',parameters)).json();
+  const id=variant.tasks[0].id;
+  for(const message of ['200 см','Я получил 0,002 км']){
+    const feedback=await(await app.action(id,'respond',{message})).json();
+    assert.equal(feedback.kind,'feedback');assert.equal(feedback.verdict,'correct');assert.equal(feedback.method,'code');
+  }
+  assert.equal((await(await app.action(id,'respond',{message:'2 с'})).json()).verdict,'incorrect');
+  const clarify=await(await app.action(id,'check',{answer:'2'})).json();
+  assert.equal(clarify.verdict,'clarify');assert.match(clarify.explanation,/единицах/);
+  assert.equal(calls,1);
+});
+
+test('polite explicit commands open a solution or hint without a classifier, while negation remains chat',async t=>{
+  let calls=0;
+  const app=(await harness(t,{settings,fetchModel:async()=>modelResponse(++calls===1?generated():{intent:'chat',message:'Хорошо, разберём только следующий шаг.'})})).client();
+  const {variant}=await(await app.generate('ai')).json();const id=variant.tasks[0].id;
+  const solution=await(await app.action(id,'respond',{message:'Можешь показать мне решение?'})).json();
+  assert.equal(solution.kind,'solution');assert.equal(solution.answer,reference.answer);
+  assert.equal((await(await app.action(id,'respond',{message:'Можете дать мне подсказку?'})).json()).kind,'message');
+  assert.equal(calls,1);
+  const chat=await(await app.action(id,'respond',{message:'Можешь не показывать решение?'})).json();
+  assert.equal(chat.kind,'message');assert.ok(!Object.hasOwn(chat,'answer'));assert.equal(calls,2);
+});
+
+test('failed automatic grading can be retried without duplicating a submitted attempt in history',async t=>{
+  let calls=0;
+  const app=(await harness(t,{settings,fetchModel:async()=>{
+    calls++;
+    if(calls===1)return modelResponse(generated());
+    if(calls===2||calls===4)return modelResponse({intent:'answer'});
+    if(calls===3)return new Response('Unavailable',{status:503});
+    return modelResponse({verdict:'correct',explanation:'Способ решения верный.',error:'',hint:''});
+  }})).client();
+  const {variant}=await(await app.generate('ai')).json();const id=variant.tasks[0].id;
+  const message='Я разделил числитель на знаменатель и получил половину.';
+  assert.equal((await app.action(id,'respond',{message})).status,503);
+  const afterError=(await(await app.get('/api/history')).json()).variants[0];
+  assert.deepEqual(afterError.solved,[false]);assert.deepEqual(afterError.tasks[0].chat,[]);
+  const retried=await(await app.action(id,'respond',{message})).json();assert.equal(retried.verdict,'correct');
+  const history=(await(await app.get('/api/history')).json()).variants[0];publicOnly(history);
+  assert.equal(history.tasks[0].chat.filter(item=>item.role==='user'&&item.content===message).length,1);
+  assert.match(history.tasks[0].chat[1].content,/Оценка ИИ/);assert.deepEqual(history.solved,[true]);
+});
+
 test('custom practice retains its subject through checking, conversation, history and similar tasks',async t=>{
   const parameters={topic:'custom',customTopic:'  Вероятность — честная монета  ',level:'easy',count:1,untrustedExtra:'must not persist'};
   const normalized={topic:'custom',customTopic:parameters.customTopic.trim(),level:'easy',count:1};

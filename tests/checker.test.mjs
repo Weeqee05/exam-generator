@@ -7,8 +7,24 @@ import {plainText} from '../dist/export.mjs';
 const task = (answer, proof) => ({question:'Учебное задание', answer, hint:'Не раскрывать этот текст автоматически.', explanation:'Эталонное решение', ...(proof ? {proof} : {})});
 const check = (expected, answer) => checkDeterministic(task(expected), answer);
 
+test('measured quantities accept equivalent units and reject wrong dimensions or values', () => {
+  for (const [expected,answer] of [['2 м','200 см'],['1/2 кг','500 g'],['1 ч','3600 s'],['10 м/с','36 км/ч'],['0,2 м','200 мм']]) {
+    assert.equal(check(expected,answer)?.verdict,'correct',answer);
+  }
+  assert.equal(check('2 м','200 м').verdict,'incorrect');
+  assert.equal(check('2 м','2 с').verdict,'incorrect');
+  assert.equal(check('2 м','2').verdict,'clarify');
+  assert.equal(check('2 м','200 см или 300 см').verdict,'clarify');
+  assert.equal(check('2 м','200 см?').verdict,'clarify');
+  assert.equal(check('2 м','2 yards'),null,'unknown units need the model');
+  assert.equal(checkDeterministic({...task('2 м'),question:'Найди длину и обоснуй расчёт.'},'200 см'),null);
+  assert.equal(checkDeterministic({...task('2 м'),question:'Найди длину и время.'},'200 см'),null);
+  assert.notEqual(check('0 м','1e-999 км')?.verdict,'correct');
+  assert.ok(!JSON.stringify(check('2 м','3 м')).includes('2 м'));
+});
+
 test('equivalent fractions, decimal comma and safe arithmetic are accepted', () => {
-  for (const answer of ['0,5','0.50','2/4','(3-1)/4','Ответ: 1/2','x=0,5']) assert.equal(check('1/2',answer)?.verdict,'correct',answer);
+  for (const answer of ['0,5','0.50','2/4','(3-1)/4','Ответ: 1/2','x=0,5','Мой ответ:0,5','Я получил 1/2','Я получила 0.5','Получилось 2/4']) assert.equal(check('1/2',answer)?.verdict,'correct',answer);
   assert.equal(check('2^(49)','562949953421312').verdict,'correct');
   assert.equal(check('2^(49)','562949953421313').verdict,'incorrect','large integers must not use a broad relative tolerance');
   assert.equal(check('1/3','0.3333').verdict,'incorrect','rounded answers are not automatically equal');
@@ -32,6 +48,8 @@ test('wrong, empty and ambiguous answers do not pass or reveal a reference', () 
   const ambiguous = check('1/2','0,5 или 0,6');
   assert.equal(ambiguous.verdict,'clarify');
   assert.equal(ambiguous.needsClarification,true);
+  assert.equal(check('1/2','Как начать решение?'),null,'a question is not an ambiguous submitted number');
+  assert.equal(check('2 м','Как найти длину?'),null);
 });
 
 test('complex numbers compare both components and detect a partial answer', () => {

@@ -551,7 +551,7 @@ h1 {
   align-items: center;
   justify-content: center;
   gap: 7px;
-  min-height: 40px;
+  min-height: 44px;
   flex: 1 1 auto;
   padding: 8px 10px;
   border: 1px solid #455459;
@@ -1032,8 +1032,9 @@ h1 {
 .icon-button {
   display: grid;
   place-items: center;
-  width: 32px;
-  height: 32px;
+  width: 44px;
+  height: 44px;
+  flex-shrink: 0;
   border: 1px solid var(--line);
   border-radius: 8px;
   flex-shrink: 0;
@@ -1562,9 +1563,9 @@ input[type=number] {
     gap: 6px;
   }
   .quick-actions button {
-    font-size: 10px;
+    font-size: 11px;
     gap: 5px;
-    min-height: 40px;
+    min-height: 44px;
     padding: 8px 6px;
   }
   .quick-actions svg {
@@ -1577,8 +1578,8 @@ input[type=number] {
     min-height: 54px;
   }
   .send-button {
-    width: 37px;
-    height: 40px;
+    width: 44px;
+    height: 44px;
   }
   .composer-footer {
     font-size: 9px;
@@ -1725,4 +1726,9 @@ input[type=number] {
   .provider-picker label { margin: 0; font-size: 10px; }
   .provider-picker select { width: auto; flex: 1; min-height: 35px; padding: 7px; font-size: 12px; }
   .provider-picker .field-note { display: none; }
+}
+
+@media (max-width: 540px) {
+  .modal input,.modal select,.provider-picker select { font-size: 16px; }
+  .provider-picker select { min-height: 44px; }
 }

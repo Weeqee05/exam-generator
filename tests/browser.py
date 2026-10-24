@@ -68,6 +68,7 @@ class SimulatedAPI:
         self.hold_generate = False
         self.hold_check = False
         self.next_check_error = False
+        self.next_non_json_error = False
 
     def variant(self, config, source='ai'):
         value = {
@@ -129,12 +130,16 @@ class SimulatedAPI:
         if automatic:
             text = body.get('message','').strip()
             if text == 'Напиши подробное решение': action='solution'
+            elif text == 'Дай похожее задание': action='similar'
             elif re.fullmatch(r'[0-9.,/ +*-]+',text): action='check';body['answer']=text
             else: action='chat'
         def reply(data):
             kind={'check':'feedback','solution':'solution','similar':'variant'}.get(action,'message')
             return route.fulfill(json={'kind':kind,**data} if automatic else data)
         if action == 'check':
+            if self.next_non_json_error:
+                self.next_non_json_error = False
+                return route.fulfill(status=502,content_type='text/html',body='<html>Bad gateway</html>')
             if self.next_check_error:
                 self.next_check_error = False
                 return route.fulfill(status=502, json={'error': 'Проверка временно недоступна. Попробуй ещё раз.'})
@@ -162,7 +167,10 @@ class SimulatedAPI:
 
 
 with sync_playwright() as playwright:
-    browser = playwright.chromium.launch(executable_path=os.environ.get('CHROMIUM_PATH', '/usr/bin/chromium'), headless=True, args=['--no-sandbox'])
+    chromium_path=os.environ.get('CHROMIUM_PATH') or ('/usr/bin/chromium' if Path('/usr/bin/chromium').exists() else None)
+    launch_options={'headless':True,'args':['--no-sandbox']}
+    if chromium_path: launch_options['executable_path']=chromium_path
+    browser = playwright.chromium.launch(**launch_options)
     context = browser.new_context(viewport={'width':1440,'height':1000}, accept_downloads=True)
     status = context.request.get(BASE + '/api/status')
     assert status.ok and status.json().get('aiAvailable') is False, 'Use a keyless createApp({settings:{}}) server.'
@@ -215,6 +223,7 @@ with sync_playwright() as playwright:
     page.reload(); expect(page.locator('#task-question')).to_have_text(question,use_inner_text=True)
     expect(page.locator('#chat-messages')).to_contain_text(f'{expected*2}/2')
     expect(page.locator('#chat-messages')).to_contain_text('Верно')
+    expect(page.locator('#chat-messages')).to_contain_text('Проверено вычислением')
     expect(page.locator('#chat-input')).to_have_value('мой черновик')
     expect(page.locator('#progress-label')).to_contain_text('1 из 3')
     assert not solution_requests
@@ -245,6 +254,9 @@ with sync_playwright() as playwright:
     for width in (320,390,768,1024,1440):
         page.set_viewport_size({'width':width,'height':1000})
         assert not page.evaluate('() => document.documentElement.scrollWidth > innerWidth'), f'Overflow {width}'
+        if width<=390:
+            assert page.locator('#chat-send').bounding_box()['height']>=44
+            assert all(button.bounding_box()['height']>=44 for button in page.locator('.quick-actions button').all())
         page.locator('#chat-input').focus();assert page.locator('#chat-input').evaluate('(e)=>e===document.activeElement')
         choose_settings(page,'python','easy',3)
         assert not page.evaluate('() => document.documentElement.scrollWidth > innerWidth'), f'Dialog overflow {width}'
@@ -359,6 +371,8 @@ with sync_playwright() as playwright:
         assert not ai_page.evaluate('() => document.documentElement.scrollWidth > innerWidth'), f'Custom subject overflow {width}'
         ai_page.click('#new-dialog')
         expect(ai_page.locator('#custom-topic')).to_have_value(subject)
+        ai_page.keyboard.press('Tab')
+        assert ai_page.locator('#settings-dialog').evaluate('(e)=>e.contains(document.activeElement)')
         assert not ai_page.evaluate('() => document.documentElement.scrollWidth > innerWidth'), f'Custom dialog overflow {width}'
         ai_page.keyboard.press('Escape')
     ai_page.locator('[data-chat-action="similar"]').click()
@@ -371,6 +385,39 @@ with sync_playwright() as playwright:
     assert 'customTopic' not in fixture.variants[0]['config']
     assert not errors,errors
     print('PASS browser: custom subjects, empty input, AI-only presets, reload/history/export, safe titles and 320–1440px')
+    ai_page.click('#new-dialog');ai_page.fill('#count','2');ai_page.click('#generate-button')
+    original=fixture.variants[0];original_id=original['id'];task=original['tasks'][1]
+    ai_page.locator(f'[data-select-task="{task["id"]}"]').click()
+    ai_page.locator('[data-chat-action="solution"]').click()
+    ai_page.fill('#chat-input','черновик решения')
+    task['chat'].append({'role':'assistant','content':'Новое объяснение из другой вкладки.'})
+    ai_page.click('#nav-history');ai_page.locator(f'[data-load="{original_id}"]').click()
+    expect(ai_page.locator('[data-select-task].active')).to_have_attribute('data-select-task',task['id'])
+    expect(ai_page.locator('#chat-messages')).to_contain_text('Новое объяснение из другой вкладки.')
+    expect(ai_page.locator('.solution-content')).to_be_visible()
+    expect(ai_page.locator('#chat-input')).to_have_value('черновик решения')
+    fixture.next_non_json_error=True;send_answer(ai_page,'1/2')
+    expect(ai_page.locator('#chat-error')).to_contain_text('HTTP 502')
+    expect(ai_page.locator('#chat-input')).to_have_value('1/2')
+    send_answer(ai_page,'1/2');expect(ai_page.locator('.verdict-label').last).to_have_text('Верно')
+    send_answer(ai_page,'Дай похожее задание')
+    expect(ai_page.locator('[data-select-task]')).to_have_count(1)
+    ai_page.click('#nav-history');ai_page.locator(f'[data-load="{original_id}"]').click()
+    expect(ai_page.locator('#chat-input')).to_have_value('')
+    expect(ai_page.locator('[data-select-task].active')).to_have_attribute('data-select-task',task['id'])
+    assert not errors,errors
+    print('PASS browser: fresh history, task selection, revealed solution, HTML gateway error/retry and consumed similar-command draft')
+    fallback_context=browser.new_context()
+    fallback_fixture=SimulatedAPI()
+    def unavailable_models(route):
+        if urlparse(route.request.url).path=='/api/models':return route.fulfill(status=503,content_type='text/html',body='Unavailable')
+        return fallback_fixture.route(route)
+    fallback_context.route('**/api/**',unavailable_models)
+    fallback_page=fallback_context.new_page();fallback_page.on('pageerror',lambda error:errors.append(str(error)))
+    fallback_page.goto(BASE);fallback_page.click('#new-dialog');fallback_page.fill('#count','1');fallback_page.click('#generate-button')
+    expect(fallback_page.locator('#provider-status')).to_contain_text('основная модель сервера')
+    assert next(body for path,body in fallback_fixture.calls if path=='/api/generate')['provider'] is None
+    fallback_context.close()
     for blocked_getter in (True, False):
         guarded = browser.new_context(viewport={'width':390,'height':844})
         if blocked_getter:
@@ -379,7 +426,7 @@ with sync_playwright() as playwright:
             guarded.add_init_script("Object.defineProperty(window,'localStorage',{value:Object.freeze({getItem(){return null},setItem(){throw Error('readonly')},removeItem(){throw Error('readonly')}})})")
         guarded_fixture = SimulatedAPI()
         protected_variant = guarded_fixture.variant({'topic':'python','level':'easy','count':1})
-        protected_variant['tasks'][0]['question'] = 'Что выведет программа?\nprint("<img src=x onerror=alert(1)>")'
+        protected_variant['tasks'][0]['question'] = 'Что выведет программа? Формула: f(x) = (x² − 1)/(x + 1), x ≠ −1.\nprint("<img src=x onerror=alert(1)> ' + 'ДлиннаяСтрока'*40 + '")'
         guarded.route('**/api/**',guarded_fixture.route)
         guarded_page = guarded.new_page()
         guarded_page.on('pageerror',lambda error:errors.append(str(error)))

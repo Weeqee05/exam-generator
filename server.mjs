@@ -14,7 +14,7 @@ import {generationMessages} from './prompts/generation.mjs';
 import {checkingMessages} from './prompts/checking.mjs';
 import {explanationMessages} from './prompts/explanation.mjs';
 import {dialogueMessages} from './prompts/dialogue.mjs';
-import {directAction, feedbackParagraphs} from './dist/dialogue.mjs';
+import {directAction, feedbackParagraphs, feedbackMethod} from './dist/dialogue.mjs';
 
 export {loadProviderSettings, configureRuntimeProxy};
 
@@ -152,7 +152,7 @@ export function createApp({settings = process.env, fetchModel = globalThis.fetch
     task.attempts.push({answer:studentAnswer, verdict:feedback.verdict});
     if (task.attempts.length > 10) task.attempts.shift();
     const title = {correct:'Верно',incorrect:'Неверно',partial:'Частично верно',clarify:'Уточни ответ'}[feedback.verdict];
-    store.remember(task, studentAnswer, [title, ...feedbackParagraphs(feedback)].join('\n'));
+    store.remember(task, studentAnswer, [title, ...feedbackParagraphs(feedback), feedbackMethod(feedback)].join('\n'));
     return feedback;
   }
 

@@ -17,7 +17,7 @@ export const LEVELS = {
   hard: {name:'Сложный', description:'Сочетание приёмов и рассуждение', minutes:8}
 };
 export function validConfig(c) {
-  return !!c && typeof c.topic === 'string' && Object.hasOwn(TOPICS,c.topic) && Object.hasOwn(LEVELS,c.level) && Number.isInteger(c.count) && c.count>=1 && c.count<=10
+  return !!c && typeof c.topic === 'string' && Object.hasOwn(TOPICS,c.topic) && typeof c.level === 'string' && Object.hasOwn(LEVELS,c.level) && Number.isInteger(c.count) && c.count>=1 && c.count<=10
     && (c.topic !== 'custom' || (typeof c.customTopic === 'string' && c.customTopic.trim().length >= 2 && c.customTopic.length <= 160 && !/[\u0000-\u001f\u007f]/u.test(c.customTopic)));
 }
 export const hasTemplates = topic => Object.hasOwn(TOPICS, topic) && TOPICS[topic].templates === true;
