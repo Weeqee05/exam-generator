@@ -3,87 +3,92 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#14594c">
-  <meta name="description" content="Практикум — ИИ-ассистент для генерации и проверки практических заданий к экзамену. Решай, получай обратную связь и разбирай задания в чате.">
-  <title>Практикум — учебный ИИ-ассистент</title>
-  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%2314594c'/%3E%3Cpath d='M18 46V18h28v28M32 18v28' fill='none' stroke='%23d5f3ca' stroke-width='6'/%3E%3C/svg%3E">
+  <meta name="theme-color" content="#111617">
+  <meta name="description" content="Экзамен+ — ИИ-ассистент для подготовки к экзаменам. Создавай задания, проверяй ответы и разбирайся в решении.">
+  <title>Экзамен+ — ИИ-ассистент для подготовки к экзаменам</title>
+  <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='16' fill='%23d8fc73'/%3E%3Ctext x='12' y='44' font-family='Arial' font-size='38' font-weight='bold' fill='%23111617'%3Eэ%3C/text%3E%3C/svg%3E">
   <link rel="stylesheet" href="styles.css">
   <script type="module" src="app.mjs"></script>
 </head>
 <body>
   <svg class="icon-defs" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>
-    <symbol id="i-spark" viewBox="0 0 24 24"><path d="m12 3 2.7 6.3L21 12l-6.3 2.7L12 21l-2.7-6.3L3 12l6.3-2.7Z"/><path d="m20 2 .5 1.5L22 4l-1.5.5L20 6l-.5-1.5L18 4l1.5-.5Z"/></symbol>
-    <symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></symbol>
+    <symbol id="i-chat" viewBox="0 0 24 24"><path d="M20 11a8 8 0 0 1-8 8H5l-3 3V11a9 9 0 0 1 18 0Z"/></symbol>
     <symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
     <symbol id="i-book" viewBox="0 0 24 24"><path d="M12 5v15M3 4c3-1 6 0 9 2 3-2 6-3 9-2v14c-3-1-6 0-9 2-3-2-6-3-9-2Z"/></symbol>
-    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M5 12h14m-6-6 6 6-6 6"/></symbol>
-    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5M6 6a8 8 0 0 1 13 3M5 15a8 8 0 0 0 13 3"/></symbol>
-    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
-    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M9 9a3 3 0 1 1 4 3c-1 .5-1 1-1 2M12 17h.01"/></symbol>
     <symbol id="i-bulb" viewBox="0 0 24 24"><path d="M9 18h6m-5 3h4M8 15c-4-4-2-11 4-11s8 7 4 11l-1 3H9Z"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M12 20V4m-7 7 7-7 7 7"/></symbol>
+    <symbol id="i-refresh" viewBox="0 0 24 24"><path d="M20 7v5h-5M4 17v-5h5M6 6a8 8 0 0 1 13 3M5 15a8 8 0 0 0 13 3"/></symbol>
+    <symbol id="i-close" viewBox="0 0 24 24"><path d="m6 6 12 12M6 18 18 6"/></symbol>
+    <symbol id="i-code" viewBox="0 0 24 24"><path d="m8 6-6 6 6 6m8-12 6 6-6 6M14 3l-4 18"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
     <symbol id="i-download" viewBox="0 0 24 24"><path d="M12 3v12m-4-4 4 4 4-4M4 15v5h16v-5"/></symbol>
-    <symbol id="i-printer" viewBox="0 0 24 24"><path d="M6 8V3h12v5M6 17H3V8h18v9h-3M6 14h12v7H6Z"/><path d="M17 11h1"/></symbol>
+    <symbol id="i-printer" viewBox="0 0 24 24"><path d="M6 8V3h12v5M6 17H3V8h18v9h-3M6 14h12v7H6Z"/></symbol>
   </defs></svg>
-  <a class="skip-link" href="#main">Перейти к заданиям</a>
-  <header class="site-header">
-    <div class="header-inner">
-      <a class="brand" href="./" aria-label="Практикум — главная"><span class="brand-mark">п</span><span>практикум<span class="brand-dot">.</span></span></a>
-      <nav class="navigation" aria-label="Главное меню">
-        <button class="nav-item active" id="nav-generator" type="button"><svg><use href="#i-grid"/></svg>Практика</button>
-        <button class="nav-item" id="nav-history" type="button" data-request><svg><use href="#i-clock"/></svg>Мои варианты<span class="history-count" id="history-count">0</span></button>
-        <button class="nav-item" id="nav-guide" type="button"><svg><use href="#i-book"/></svg>Как это работает</button>
-      </nav>
-    </div>
-  </header>
-  <main id="main">
-    <div class="content">
-      <section class="hero" aria-labelledby="hero-title">
-        <div class="hero-copy"><div class="eyebrow">УЧЕБНЫЙ ИИ-АССИСТЕНТ</div><h1 id="hero-title">Понять. Решить. <em>Сдать.</em></h1><p>Задания, проверка твоих ответов и помощь на каждом шаге.</p></div>
-        <aside class="hero-note"><span class="note-mark" aria-hidden="true"><svg><use href="#i-bulb"/></svg></span><div><strong>Сначала твоя попытка</strong><p>Подсказка направит.<br>Ассистент поможет разобраться.</p></div></aside>
-      </section>
-      <div class="practice-overview" aria-label="Прогресс текущей сессии"><div><strong id="saved-variants">0</strong><span>вариантов в истории</span></div><span class="overview-divider" aria-hidden="true"></span><div><strong id="solved-total">0</strong><span>ответов проверено верно</span></div><span class="storage-note"><svg><use href="#i-check"/></svg>Твоя учебная сессия</span></div>
-      <section class="config-card" aria-labelledby="config-title">
-        <div class="section-caption"><h2 id="config-title">Настрой свою практику</h2><span>01 / Параметры</span></div>
-        <form id="generator-form">
-          <div class="settings-grid">
-            <div class="field topic-field"><label for="topic">Тема</label><div class="select-wrap"><svg><use href="#i-book"/></svg><select id="topic" name="topic"><option value="complex">Комплексные числа</option><option value="sets">Множества и отношения</option><option value="python">Python: основы и алгоритмы</option></select></div><span class="field-description" id="topic-description">Арифметика, степени и уравнения</span></div>
-            <fieldset class="field level-field"><legend>Уровень сложности</legend><div class="level-options"><label><input type="radio" name="level" value="easy" checked><span>Базовый</span></label><label><input type="radio" name="level" value="medium"><span>Средний</span></label><label><input type="radio" name="level" value="hard"><span>Сложный</span></label></div><span class="field-description" id="level-description">Чтобы разобраться в основах</span></fieldset>
-            <div class="field count-field"><label for="count">Количество заданий</label><div class="stepper"><button type="button" id="decrease" aria-label="Уменьшить количество">−</button><input id="count" name="count" type="number" min="1" max="10" step="1" value="5" required inputmode="numeric"><button type="button" id="increase" aria-label="Увеличить количество">+</button></div><span class="field-description">От 1 до 10 за один подход</span></div>
-          </div>
-          <div class="config-footer">
-            <div class="source-settings"><label for="source" class="sr-only">Как создать задания</label><select id="source" name="source" aria-describedby="source-description connection-status"><option value="local">Обычная практика</option><option value="ai" id="ai-option" disabled>С помощью ИИ</option></select><span id="source-description" class="sr-only">Задания по проверенным шаблонам.</span><span id="connection-status" class="connection-status">Проверяем подключение…</span></div>
-            <div class="config-bottom"><p><svg><use href="#i-clock"/></svg><span id="time-estimate">Примерно 15 минут практики</span></p><button class="primary-button" type="submit" id="generate-button"><svg><use href="#i-spark"/></svg>Создать вариант<svg class="button-arrow"><use href="#i-arrow"/></svg></button></div>
-          </div>
-        </form>
-      </section>
-      <div id="generation-status" class="generation-status" role="status" hidden><span class="spinner" aria-hidden="true"></span><span id="generation-status-text"></span></div>
-      <p id="generation-error" class="generation-error" role="alert" hidden></p>
-      <div id="settings-notice" class="settings-notice" hidden>Настройки изменены. Создай вариант, чтобы применить их к новым заданиям.</div>
-      <div id="empty-state" class="empty-state"><svg aria-hidden="true"><use href="#i-book"/></svg><p>Выбери тему и создай вариант — здесь появятся задания и ассистент.</p></div>
-      <section class="results" id="results" aria-labelledby="results-title" hidden>
-        <div class="results-header"><div><div class="result-title-row"><h2 id="results-title">Твой вариант <span id="variant-number">001</span></h2><span id="variant-source" class="source-badge">Проверенные шаблоны</span></div><p id="variant-summary"></p></div><button class="secondary-button" type="button" id="regenerate" data-request><svg><use href="#i-refresh"/></svg>Новый вариант</button></div>
-        <p id="model-warning" class="model-warning" hidden>ИИ может ошибаться. Сравнивай объяснение со своим решением и учебным материалом.</p>
-        <div class="study-toolbar"><div class="progress-area"><span id="progress-label">Проверено верно 0 из 5</span><div class="progress-track" aria-hidden="true"><span id="progress-fill"></span></div></div><div class="variant-actions"><button type="button" class="secondary-button" id="download-variant"><svg><use href="#i-download"/></svg>Скачать задания</button><button type="button" class="secondary-button" id="print-variant"><svg><use href="#i-printer"/></svg>Печать / PDF</button></div></div>
-        <div class="study-grid">
-          <div class="worksheet"><div class="practice-tip"><svg><use href="#i-bulb"/></svg><p>Введи свой ответ и нажми «Проверить». Решение откроется только по твоему запросу.</p></div><div id="task-list" class="task-list"></div><div class="completion-note" id="completion-note" hidden><svg><use href="#i-check"/></svg><div><strong>Вариант пройден!</strong><p>Все ответы проверены верно. Попробуй похожее задание или новый уровень.</p></div></div></div>
-          <aside class="assistant-panel" id="assistant-panel" aria-labelledby="assistant-title">
-            <div class="assistant-heading"><span class="assistant-avatar" aria-hidden="true">п.</span><div><h2 id="assistant-title">Разберём вместе</h2><p>Ассистент по текущему заданию</p></div><span class="assistant-dot" aria-hidden="true"></span></div>
-            <div class="chat-task-picker"><label for="chat-task">Обсуждаем</label><select id="chat-task" aria-label="Задание для обсуждения"></select></div>
-            <details class="chat-context-details" id="chat-context-details"><summary>Посмотреть условие</summary><div class="model-text" id="chat-context"></div></details>
-            <div class="chat-messages" id="chat-messages" role="log" aria-live="polite" aria-label="Переписка по заданию"></div>
-            <div class="chat-quick-actions" id="chat-quick-actions" aria-label="Быстрые действия"><button type="button" data-chat-action="hint" data-request>Дай подсказку</button><button type="button" data-chat-action="simpler" data-request>Объясни проще</button><button type="button" data-chat-action="solution" data-request>Покажи решение</button><button type="button" data-chat-action="similar" data-request>Дай похожее задание</button></div>
-            <p class="chat-loading" id="chat-loading" role="status" hidden></p><p id="chat-error" class="task-error chat-error" role="alert" hidden></p>
-            <form id="chat-form" class="chat-form"><label for="chat-input" class="sr-only">Вопрос ассистенту по заданию</label><textarea id="chat-input" rows="2" maxlength="2000" placeholder="Что именно непонятно?" aria-describedby="chat-note"></textarea><button type="submit" class="primary-button" id="chat-send" data-request aria-label="Отправить вопрос ассистенту"><svg><use href="#i-arrow"/></svg></button></form>
-            <p class="chat-note" id="chat-note">Помогаю сделать следующий шаг. Полный ответ — по кнопке «Покажи решение».</p>
-          </aside>
+  <a class="skip-link" href="#main">Перейти к практике</a>
+  <aside class="rail" aria-label="Навигация">
+    <a class="brand-mark" href="./" aria-label="Экзамен+ — главная">э<span>+</span></a>
+    <button id="rail-practice" class="rail-button active" type="button" title="Практика" aria-label="Практика"><svg><use href="#i-chat"/></svg></button>
+    <button id="rail-history" class="rail-button" type="button" title="История" aria-label="История" data-request><svg><use href="#i-clock"/></svg></button>
+    <button id="rail-guide" class="rail-button" type="button" title="Как это работает" aria-label="Как это работает"><svg><use href="#i-book"/></svg></button>
+    <span class="rail-divider"></span>
+    <button id="rail-help" class="rail-button" type="button" title="О проекте" aria-label="О проекте"><svg><use href="#i-help"/></svg></button>
+    <span class="rail-bottom">УЧИСЬ<br>В ДИАЛОГЕ</span>
+  </aside>
+  <div class="app-shell">
+    <header class="topbar">
+      <a class="wordmark" href="./">экзамен<span>+</span></a><span class="brand-caption">ИИ-ассистент для экзамена</span>
+      <nav aria-label="Главное меню"><button id="nav-generator" class="nav-link active" type="button">Практика</button><button id="nav-history" class="nav-link" type="button" data-request>История <span id="history-count">0</span></button></nav>
+      <button id="new-dialog" class="outline-button new-dialog" type="button" data-request><svg><use href="#i-plus"/></svg><span>Новый диалог</span></button>
+    </header>
+    <main id="main" class="workspace">
+      <section class="conversation" aria-labelledby="conversation-title">
+        <header class="conversation-heading"><p class="eyebrow"><span class="status-dot"></span><span id="context-label">ТВОЯ ПОДГОТОВКА К ЭКЗАМЕНУ</span></p><h1 id="conversation-title">Разберём по шагам</h1><p>Задания, обратная связь и помощь в одном диалоге.</p></header>
+        <p id="app-error" class="error-message" role="alert" hidden></p>
+        <div id="welcome" class="welcome">
+          <span class="welcome-spark" aria-hidden="true">✦</span><h2>С чего начнём?</h2><p>Выбери тему. Я подготовлю задания, помогу разобраться<br class="desktop-break"> с ошибками и объясню непонятное.</p>
+          <div class="starter-topics"><button type="button" data-topic="complex" data-request>Комплексные числа <span>↗</span></button><button type="button" data-topic="sets" data-request>Множества и отношения <span>↗</span></button><button type="button" data-topic="python" data-request>Основы Python <span>↗</span></button></div>
+          <button id="start-practice" type="button" class="primary-button" data-request>Начать практику <span>↗</span></button>
+        </div>
+        <div id="thread" class="thread" hidden>
+          <article class="message from-assistant task-message"><span class="avatar" aria-hidden="true">✦</span><div class="message-body"><div class="message-author">Ассистент <span id="variant-source"></span></div><p class="task-intro">Попробуй решить самостоятельно. Я помогу на любом шаге.</p><section id="task-card" class="task-card" aria-label="Текущее задание"><div class="task-caption"><span id="task-position"></span><span id="task-tag" class="task-tag"></span></div><div id="task-question" class="task-question"></div></section><p class="task-instruction">Напиши свой ответ — проверим вместе.</p></div></article>
+          <div id="chat-messages" role="log" aria-label="Диалог по заданию" aria-live="polite"></div>
+        </div>
+        <div class="composer-area">
+          <div id="request-status" class="request-status" role="status" hidden><span class="spinner" aria-hidden="true"></span><span id="request-status-text"></span></div>
+          <p id="chat-error" class="error-message" role="alert" hidden></p>
+          <div id="chat-quick-actions" class="quick-actions" aria-label="Быстрые действия"><button type="button" data-chat-action="hint" data-task-request><svg><use href="#i-bulb"/></svg>Подсказка</button><button type="button" data-chat-action="simpler" data-task-request><svg><use href="#i-book"/></svg>Объясни проще</button><button type="button" data-chat-action="solution" data-task-request><svg><use href="#i-check"/></svg>Покажи решение</button><button type="button" data-chat-action="similar" data-task-request><svg><use href="#i-refresh"/></svg>Похожее задание</button></div>
+          <form id="chat-form" class="composer">
+            <div class="composer-mode" role="group" aria-label="Что отправить"><button id="mode-answer" type="button" aria-pressed="true" data-task-request>Мой ответ</button><button id="mode-question" type="button" aria-pressed="false" data-task-request>Вопрос ассистенту</button></div>
+            <div class="composer-input"><label for="chat-input" class="sr-only">Твой ответ или вопрос ассистенту</label><textarea id="chat-input" rows="2" maxlength="4000" placeholder="Сначала создай задания — и начнём практику" aria-describedby="composer-note"></textarea><button id="chat-send" type="submit" class="send-button" aria-label="Проверить ответ" data-task-request><svg><use href="#i-arrow"/></svg></button></div>
+          </form>
+          <div class="composer-footer"><p id="composer-note">Сначала твоя попытка. Подсказки рядом.</p><span>Enter — отправить · Shift+Enter — новая строка</span></div>
         </div>
       </section>
-      <footer class="page-footer"><span class="footer-brand">практикум.</span><span>Маленькая практика. Заметный прогресс.</span><button type="button" id="footer-about">О курсовом проекте <span>↗</span></button></footer>
-    </div>
-  </main>
-  <dialog id="history-dialog" class="modal" aria-labelledby="history-title"><div class="modal-header"><div><span class="eyebrow">ТВОЯ ПРАКТИКА</span><h2 id="history-title">Мои варианты</h2></div><button type="button" class="icon-button" data-close aria-label="Закрыть историю"><svg><use href="#i-close"/></svg></button></div><p class="modal-intro">Последние 20 вариантов текущей сессии. Условия, результаты и чат доступны до перезапуска сервера или окончания сессии. Черновики твоих ответов сохраняются в этом браузере.</p><label for="history-search" class="search-label">Найти вариант</label><input id="history-search" class="history-search" type="search" placeholder="Тема, сложность или номер" autocomplete="off"><div id="history-list"></div></dialog>
-  <dialog id="guide-dialog" class="modal guide-modal" aria-labelledby="guide-title"><div class="modal-header"><div><span class="eyebrow">ПО ШАГАМ</span><h2 id="guide-title">Как это работает</h2></div><button type="button" class="icon-button" data-close aria-label="Закрыть инструкцию"><svg><use href="#i-close"/></svg></button></div><div class="guide-step"><span>01</span><div><h3>Собери свой вариант</h3><p>Выбери тему, уровень сложности и от 1 до 10 заданий. Обычная практика создаёт задания по шаблонам, режим ИИ — через языковую модель. При открытии страницы платный запрос не отправляется.</p></div></div><div class="guide-step"><span>02</span><div><h3>Реши и проверь</h3><p>Введи ответ или текст своего решения. Получи результат: «Верно», «Неверно» или «Частично верно» — с объяснением и направлением для следующей попытки. Если запись неоднозначна, ассистент попросит уточнение. Дробь 1/2 и число 0,5 можно записывать по-разному.</p></div></div><div class="guide-step"><span>03</span><div><h3>Разберись с ассистентом</h3><p>Выбери задание в чате и задай вопрос. Ассистент учитывает предыдущие сообщения по этому заданию. Подсказка помогает продвинуться, а полный ответ и разбор открываются отдельной кнопкой «Покажи решение». Для свободного чата и проверки рассуждений нужен подключённый ИИ.</p></div></div><div class="prototype-note"><strong>О курсовом проекте</strong><p>«Разработка ИИ-ассистента для генерации и проверки практических заданий для подготовки к экзамену».</p><p>Учебная версия без регистрации. Ответы и решения хранятся на сервере; числовые ответы дополнительно проверяются вычислением. ИИ может ошибаться. Задания можно скачать или распечатать, чтобы заниматься в тетради.</p></div></dialog>
-  <div class="toast" id="toast" role="status" aria-live="polite" hidden></div><div id="announcer" class="sr-only" role="status" aria-live="polite"></div>
-  <noscript><div class="noscript">Для работы с заданиями и ассистентом включи JavaScript в браузере.</div></noscript>
+      <aside class="session-column" aria-label="Твоя практика">
+        <section class="session-panel"><h2 class="panel-label">ТВОЯ ПРАКТИКА</h2><div class="session-topic"><span class="topic-icon"><svg id="topic-icon"><use href="#i-book"/></svg></span><h3 id="session-topic">Выбери тему</h3></div><div class="session-meta"><div><span>Уровень</span><strong id="session-level">—</strong></div><div><span>Заданий</span><strong id="session-count">—</strong></div></div>
+          <div id="task-navigation" hidden><p class="panel-label">СЕЙЧАС РАЗБИРАЕМ</p><div id="task-list" class="task-list"></div><div class="progress"><span id="progress-label"></span><div class="progress-track"><span id="progress-fill"></span></div></div><p id="completion-note" class="completion-note" hidden>Все задания решены. Отличная работа!</p></div>
+          <button id="change-topic" class="text-button" type="button" data-request>Настроить практику <svg class="external-arrow"><use href="#i-arrow"/></svg></button>
+        </section>
+        <div class="encouragement"><svg><use href="#i-bulb"/></svg><p>Ошибка — повод<br>разобраться.</p></div>
+        <p id="connection-status" class="connection-status" role="status">Проверяем подключение…</p>
+        <div class="session-tools"><button id="download-variant" type="button" class="text-button" disabled><svg><use href="#i-download"/></svg>Скачать задания</button><button id="print-variant" type="button" class="text-button" disabled><svg><use href="#i-printer"/></svg>Печать / PDF</button><button id="footer-guide" type="button" class="text-button"><svg><use href="#i-help"/></svg>Как это работает</button></div>
+        <p class="model-note">ИИ может ошибаться. Сверяй объяснения с учебным материалом.</p>
+      </aside>
+    </main>
+  </div>
+  <dialog id="settings-dialog" class="modal" aria-labelledby="settings-title"><div class="modal-header"><div><span class="eyebrow">НОВАЯ ПРАКТИКА</span><h2 id="settings-title">Что будем разбирать?</h2></div><button type="button" class="icon-button" data-close aria-label="Закрыть настройки"><svg><use href="#i-close"/></svg></button></div>
+    <form id="generator-form">
+      <label for="topic">Тема</label><select id="topic"><option value="complex">Комплексные числа</option><option value="sets">Множества и отношения</option><option value="python">Python: основы и алгоритмы</option></select><p id="topic-description" class="field-note"></p>
+      <fieldset><legend>Уровень сложности</legend><div class="level-options"><label><input type="radio" name="level" value="easy" checked><span>Базовый</span></label><label><input type="radio" name="level" value="medium"><span>Средний</span></label><label><input type="radio" name="level" value="hard"><span>Сложный</span></label></div></fieldset>
+      <div class="settings-row"><div><label for="count">Количество заданий</label><input id="count" type="number" min="1" max="10" step="1" value="3" required inputmode="numeric"></div><div><label for="source">Источник заданий</label><select id="source"><option id="ai-option" value="ai" disabled>ИИ-ассистент</option><option value="local">Тренировочные шаблоны</option></select></div></div>
+      <p id="source-description" class="field-note"></p><p id="generation-error" class="error-message" role="alert" hidden></p><p id="generation-status" class="field-note" role="status" hidden>Создаём задания. Дождись ответа…</p><button class="primary-button settings-submit" id="generate-button" type="submit">Создать задания <span>↗</span></button>
+    </form>
+  </dialog>
+  <dialog id="history-dialog" class="modal" aria-labelledby="history-title"><div class="modal-header"><div><span class="eyebrow">ТВОЯ ПОДГОТОВКА</span><h2 id="history-title">История практики</h2></div><button type="button" class="icon-button" data-close aria-label="Закрыть историю"><svg><use href="#i-close"/></svg></button></div><p class="modal-intro">Последние 20 занятий этой сессии. История доступна до перезапуска сервера или окончания сессии.</p><label for="history-search" class="sr-only">Найти занятие</label><input id="history-search" type="search" placeholder="Тема, сложность или номер"><div id="history-list"></div></dialog>
+  <dialog id="guide-dialog" class="modal" aria-labelledby="guide-title"><div class="modal-header"><h2 id="guide-title">Как работает Экзамен+</h2><button type="button" class="icon-button" data-close aria-label="Закрыть инструкцию"><svg><use href="#i-close"/></svg></button></div><div class="guide-step"><span>01</span><div><h3>Выбери тему</h3><p>Нажми «Новый диалог», выбери сложность и количество заданий. ИИ создаёт задания по запросу; тренировочные шаблоны доступны без модели. Открытие страницы не расходует API-баланс.</p></div></div><div class="guide-step"><span>02</span><div><h3>Реши и проверь</h3><p>В режиме «Мой ответ» отправь число или ход решения. Получишь оценку «Верно», «Неверно» или «Частично верно» и следующий шаг. Если запись неоднозначна, ассистент попросит уточнение. Например, 1/2 и 0,5 равнозначны.</p></div></div><div class="guide-step"><span>03</span><div><h3>Разберись в диалоге</h3><p>Переключись на «Вопрос ассистенту» для обсуждения. Подсказки помогают продолжить самостоятельно. Полный ответ открывается по кнопке «Покажи решение». Выбирай текущее задание в списке справа, а на телефоне — над диалогом.</p></div></div><div class="project-note"><strong>Курсовой проект</strong><p>«Разработка ИИ-ассистента для генерации и проверки практических заданий для подготовки к экзамену».</p><p>Эталоны остаются на сервере. Числовые ответы дополнительно проверяются кодом. История временная, без регистрации и синхронизации между устройствами.</p></div></dialog>
+  <div id="toast" class="toast" role="status" aria-live="polite" hidden></div><div id="announcer" class="sr-only" role="status" aria-live="polite"></div><div id="print-sheet" aria-hidden="true"></div>
+  <noscript><p class="noscript">Для работы Экзамен+ включи JavaScript в браузере.</p></noscript>
 </body>
 </html>

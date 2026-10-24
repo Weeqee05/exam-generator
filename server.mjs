@@ -237,5 +237,5 @@ if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) 
   const host = settings.HOST || '127.0.0.1';
   const port = Number(settings.PORT || 8000);
   const server = createApp({settings});
-  server.listen(port, host, () => console.log(`Практикум: сервер запущен, порт ${port}. ИИ ${settings.LLM_API_KEY ? 'настроен; доступ проверяется при запросе' : 'не подключён; обычная практика доступна'}.`));
+  server.listen(port, host, () => console.log(`Экзамен+: сервер запущен, порт ${port}. ИИ ${settings.LLM_API_KEY ? 'настроен; доступ проверяется при запросе' : 'не подключён; обычная практика доступна'}.`));
 }

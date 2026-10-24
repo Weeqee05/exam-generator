@@ -31,20 +31,20 @@ def assert_public(value):
 
 
 def choose_settings(page, topic, level, count):
+    page.click('#new-dialog')
     page.select_option('#topic', topic)
     page.locator(f'input[name="level"][value="{level}"]').check()
     page.fill('#count', str(count))
     page.click('#generate-button')
-    expect(page.locator('.task-card')).to_have_count(count)
-    expect(page.locator('#generate-button')).to_be_enabled()
+    expect(page.locator('#settings-dialog')).not_to_be_visible()
+    expect(page.locator('[data-select-task]')).to_have_count(count)
+    expect(page.locator('#chat-send')).to_be_enabled()
 
 
-def answer_field(card):
-    return card.locator('textarea').first
-
-
-def check_button(card):
-    return card.get_by_role('button', name='Проверить', exact=True)
+def send_answer(page, text):
+    page.click('#mode-answer')
+    page.fill('#chat-input', text)
+    page.click('#chat-send')
 
 
 def screenshot_clean(page, path):
@@ -135,7 +135,7 @@ class SimulatedAPI:
             if not answer:
                 return route.fulfill(status=400, json={'error': 'Введи ответ перед проверкой.'})
             verdict = 'correct' if answer in {'0,5', '0.5', '1/2'} else 'incorrect'
-            variant['solved'][index] = verdict == 'correct'
+            variant['solved'][index] = variant['solved'][index] or verdict == 'correct'
             return route.fulfill(json=self.checked(verdict))
         if action == 'hint':
             return route.fulfill(json={'message': 'Начни с преобразования дроби в десятичную запись.'})
@@ -152,190 +152,169 @@ class SimulatedAPI:
 
 
 with sync_playwright() as playwright:
-    browser = playwright.chromium.launch(
-        executable_path=os.environ.get('CHROMIUM_PATH', '/usr/bin/chromium'),
-        headless=True, args=['--no-sandbox'])
-    context = browser.new_context(viewport={'width': 1440, 'height': 1000}, accept_downloads=True)
-    # Refuse a keyed production/development server before any action can spend
-    # API balance. Mocking only /api/status in the page would not be sufficient.
+    browser = playwright.chromium.launch(executable_path=os.environ.get('CHROMIUM_PATH', '/usr/bin/chromium'), headless=True, args=['--no-sandbox'])
+    context = browser.new_context(viewport={'width':1440,'height':1000}, accept_downloads=True)
     status = context.request.get(BASE + '/api/status')
-    assert status.ok and status.json().get('aiAvailable') is False, (
-        'Use a separate createApp({settings:{}}) server and set TEST_BASE_URL. '
-        'This browser suite must not send real model requests.')
+    assert status.ok and status.json().get('aiAvailable') is False, 'Use a keyless createApp({settings:{}}) server.'
     page = context.new_page()
-    errors = []
-    public_responses = []
-    solution_requests = []
+    errors, public_responses, solution_requests = [], [], []
     page.on('pageerror', lambda error: errors.append(str(error)))
     page.on('request', lambda request: solution_requests.append(request.url) if urlparse(request.url).path.endswith('/solution') else None)
-
     def capture_public(response):
-        path = urlparse(response.url).path
-        if response.status == 200 and (path in {'/api/generate', '/api/history'} or path.startswith('/api/variants/')):
-            value = response.json()
-            assert_public(value)
-            public_responses.append(value)
-
-    page.on('response', capture_public)
+        path=urlparse(response.url).path
+        if response.status==200 and (path in {'/api/generate','/api/history'} or path.startswith('/api/variants/')):
+            value=response.json(); assert_public(value); public_responses.append(value)
+    page.on('response',capture_public)
     page.goto(BASE)
-    expect(page.locator('.task-card')).to_have_count(5)
-    expect(page.locator('#ai-option')).to_be_disabled()
-    assert page.locator('input[data-solved]').count() == 0, 'Solved state must come from checking'
-    assert all(not text.strip() for text in page.locator('.answer-main').all_text_contents()), 'No preloaded answers in hidden markup'
+    expect(page).to_have_title(re.compile('Экзамен\\+'))
+    expect(page.locator('#welcome')).to_be_visible()
+    expect(page.locator('#chat-send')).to_be_disabled()
+    assert not any('variant' in value for value in public_responses), 'Opening must not generate tasks or spend balance'
+    for topic in ('complex','sets','python'):
+        for level in ('easy','medium','hard'):
+            choose_settings(page,topic,level,10 if level=='hard' else 1)
+    print('PASS browser: new branding/welcome, explicit generation, all topics/levels and task navigation')
 
-    for topic in ('complex', 'sets', 'python'):
-        for level in ('easy', 'medium', 'hard'):
-            choose_settings(page, topic, level, 10 if level == 'hard' else 1)
-    print('PASS browser: real local generation for all three topics, levels and 1/10 tasks; public API omits solutions')
-
-    # The expected sum is independently computed from the displayed program,
-    # rather than fetched from the server's reference answer.
-    choose_settings(page, 'python', 'easy', 3)
-    card = page.locator('.task-card').filter(has=page.locator('.task-tag', has_text='Цикл for')).first
-    code = card.locator('.task-question').inner_text()
-    upper = int(re.search(r'range\((\d+)\)', code).group(1))
-    factor = int(re.search(r's\s*\+=\s*(\d+)\s*\*\s*i', code).group(1))
-    expected_answer = factor * upper * (upper - 1) // 2
-    check_button(card).click()
-    expect(card).to_contain_text(re.compile(r'введи|введите|пуст', re.IGNORECASE))
-    answer_field(card).fill(str(expected_answer + 1))
-    check_button(card).click()
-    expect(card).to_contain_text('Неверно')
-    answer_field(card).fill(f'{expected_answer * 2}/2')
-    check_button(card).click()
-    expect(card).to_contain_text('Верно')
+    choose_settings(page,'python','easy',3)
+    page.locator('[data-select-task]').filter(has_text='Цикл for').click()
+    question=page.locator('#task-question').inner_text()
+    upper=int(re.search(r'range\((\d+)\)',question).group(1)); factor=int(re.search(r's\s*\+=\s*(\d+)\s*\*\s*i',question).group(1))
+    expected=factor*sum(range(upper))
+    page.click('#chat-send'); expect(page.locator('#chat-error')).to_contain_text('введи')
+    send_answer(page,str(expected+1)); expect(page.locator('.verdict-label').last).to_have_text('Неверно')
+    send_answer(page,f'{expected*2}/2'); expect(page.locator('.verdict-label').last).to_have_text('Верно')
     expect(page.locator('#progress-label')).to_contain_text('1 из 3')
-    variant_number = page.locator('#variant-number').inner_text()
-    question = card.locator('.task-question').inner_text()
-    page.reload()
-    expect(page.locator('#variant-number')).to_have_text(variant_number)
+    first_task=page.locator('[data-select-task].active').get_attribute('data-select-task')
+    page.fill('#chat-input','мой черновик')
+    page.locator('[data-select-task]').filter(has_text='Срезы списков').click()
+    expect(page.locator('#chat-input')).to_have_value('')
+    page.locator(f'[data-select-task="{first_task}"]').click()
+    expect(page.locator('#chat-input')).to_have_value('мой черновик')
+    page.reload(); expect(page.locator('#task-question')).to_have_text(question,use_inner_text=True)
+    expect(page.locator('#chat-input')).to_have_value('мой черновик')
     expect(page.locator('#progress-label')).to_contain_text('1 из 3')
-    expect(page.locator('.task-question').filter(has_text=question)).to_have_count(1)
-    print('PASS browser: empty/wrong/equivalent numeric answers, checked progress and history restoration')
+    assert not solution_requests
+    page.locator('[data-chat-action="hint"]').click(); expect(page.locator('#chat-messages')).to_contain_text('Дай подсказку')
+    expect(page.locator('#chat-send')).to_be_enabled(); assert not solution_requests
+    page.locator('[data-chat-action="solution"]').click(); expect(page.locator('.solution-content')).to_be_visible()
+    assert len(solution_requests)==1
+    page.locator('[data-chat-action="solution"]').click(); assert len(solution_requests)==1, 'Repeated reveal uses its explicitly loaded solution'
+    assert_public(context.request.get(BASE+'/api/history').json())
+    print('PASS browser: conversation answer checking, independent calculation, equivalent fractions, drafts, restoration and explicit solution')
 
-    # Explicitly opening a solution may fetch it; ordinary page loading and
-    # generation/history responses above may not.
-    active_card = page.locator('.task-card').first
-    assert not solution_requests, 'No solution request before explicit reveal'
-    active_card.locator('[data-task-action="hint"]').click()
-    expect(active_card.locator('.task-hint')).to_be_visible()
-    assert not solution_requests, 'A hint must not preload the solution'
-    active_card.locator('[data-task-action="solution"]').click()
-    expect(active_card.locator('.task-solution')).to_be_visible()
-    assert len(solution_requests) == 1
-    assert_public(context.request.get(BASE + '/api/history').json())
-    page.click('#nav-history')
-    expect(page.locator('#history-dialog')).to_be_visible()
-    page.fill('#history-search', 'несуществующая тема')
-    expect(page.locator('.empty-history')).to_be_visible()
-    page.locator('#history-dialog [data-close]').click()
-    expect(page.locator('#history-dialog')).not_to_be_visible()
-    page.click('#nav-guide')
-    expect(page.locator('#guide-dialog')).to_be_visible()
-    page.keyboard.press('Escape')
-    print('PASS browser: on-demand hint and solution, private reference stays out of history, guide and history search')
+    # Free dialogue is deliberately distinct from grading the same input.
+    page.click('#mode-question'); page.fill('#chat-input','Как начать решение?');page.locator('#chat-input').press('Enter')
+    expect(page.locator('#chat-messages')).to_contain_text('Как начать решение?')
+    expect(page.locator('#chat-send')).to_be_enabled()
+    with page.expect_download() as saved:
+        page.click('#download-variant')
+    text=Path(saved.value.path()).read_text(encoding='utf-8-sig')
+    assert 'ЭКЗАМЕН+' in text and 'ЗАДАНИЕ 1' in text and 'Разбор по шагам' not in text
+    page.evaluate('() => { window.print=()=>{ window.printText=document.querySelector("#print-sheet").textContent; }; }')
+    page.click('#print-variant'); assert 'ЭКЗАМЕН+' in page.evaluate('window.printText')
+    assert 'Ответ:' not in page.evaluate('window.printText')
+    page.click('#nav-history'); page.fill('#history-search','нет такого занятия'); expect(page.locator('.empty-history')).to_be_visible()
+    page.fill('#history-search','Комплексные'); page.locator('[data-load]').first.click(); expect(page.locator('#history-dialog')).not_to_be_visible()
+    page.click('#rail-guide'); expect(page.locator('#guide-dialog')).to_be_visible();page.keyboard.press('Escape')
+    print('PASS browser: question mode, keyboard submit, export/print, history search and guide')
 
-    for width in (320, 390, 768, 1024, 1440):
-        page.set_viewport_size({'width': width, 'height': 1000})
-        assert not page.evaluate('() => document.documentElement.scrollWidth > innerWidth'), f'Overflow at {width}'
-        answer_field(page.locator('.task-card').first).focus()
-        assert answer_field(page.locator('.task-card').first).evaluate('(element) => element === document.activeElement')
-    screenshot_clean(page, ARTIFACTS / 'desktop.png')
-    page.set_viewport_size({'width': 390, 'height': 844})
-    screenshot_clean(page, ARTIFACTS / 'mobile.png')
-    assert public_responses, 'No public API responses checked'
-    assert not errors, errors
-    print('PASS browser: 320–1440px layouts and desktop/mobile screenshots; no JavaScript errors')
+    for width in (320,390,768,1024,1440):
+        page.set_viewport_size({'width':width,'height':1000})
+        assert not page.evaluate('() => document.documentElement.scrollWidth > innerWidth'), f'Overflow {width}'
+        page.locator('#chat-input').focus();assert page.locator('#chat-input').evaluate('(e)=>e===document.activeElement')
+        choose_settings(page,'python','easy',3)
+        assert not page.evaluate('() => document.documentElement.scrollWidth > innerWidth'), f'Dialog overflow {width}'
+    screenshot_clean(page,ARTIFACTS/'desktop.png')
+    page.set_viewport_size({'width':390,'height':844});screenshot_clean(page,ARTIFACTS/'mobile.png')
+    assert public_responses and not errors, errors
+    print('PASS browser: responsive 320–1440px, real API privacy, screenshots and no JS errors')
 
-    # Every API call in this separate context is mocked, including task/chat
-    # routes. These checks establish UI behavior, not model correctness.
-    fixture = SimulatedAPI()
-    ai_context = browser.new_context(viewport={'width': 1280, 'height': 900})
-    ai_context.route('**/api/**', fixture.route)
-    ai_page = ai_context.new_page()
-    ai_page.on('pageerror', lambda error: errors.append(str(error)))
-    ai_page.goto(BASE)
-    expect(ai_page.locator('.task-card')).to_have_count(5)
-    expect(ai_page.locator('#source')).to_have_value('ai')
-    assert all(body.get('source') != 'ai' for path, body in fixture.calls if path == '/api/generate'), 'No paid generation on page load'
-    fixture.hold_generate = True
-    ai_page.fill('#count', '2')
-    ai_page.click('#generate-button')
+    fixture=SimulatedAPI()
+    ai_context=browser.new_context(viewport={'width':1440,'height':1000})
+    ai_context.route('**/api/**',fixture.route)
+    ai_page=ai_context.new_page();ai_page.on('pageerror',lambda error: errors.append(str(error)))
+    ai_page.goto(BASE); expect(ai_page.locator('#welcome')).to_be_visible()
+    assert not any(path=='/api/generate' for path,_ in fixture.calls)
+    ai_page.click('#new-dialog'); expect(ai_page.locator('#source')).to_have_value('ai')
+    fixture.hold_generate=True; ai_page.fill('#count','2');ai_page.click('#generate-button')
     expect(ai_page.locator('#generate-button')).to_be_disabled()
-    expect(ai_page.locator('#generation-status')).to_be_visible()
-    ai_page.locator('#generator-form').evaluate('(form) => form.dispatchEvent(new Event("submit", {bubbles:true,cancelable:true}))')
-    assert len(fixture.pending_generate) == 1
-    route = fixture.pending_generate.pop()
-    fixture.hold_generate = False
-    route.fulfill(json={'variant': fixture.variant(route.request.post_data_json['config'])})
-    expect(ai_page.locator('.task-card')).to_have_count(2)
-    expect(ai_page.locator('#generate-button')).to_be_enabled()
-    expect(ai_page.locator('.task-question').first).to_contain_text('<img src=x')
-    assert ai_page.locator('.task-question img').count() == 0
-    ai_card = ai_page.locator('.task-card').first
-    answer_field(ai_card).fill('0,5')
-    fixture.hold_check = True
-    check_button(ai_card).click()
-    expect(check_button(ai_card)).to_be_disabled()
-    ai_card.locator('.answer-form').evaluate('(form) => form.dispatchEvent(new Event("submit", {bubbles:true,cancelable:true}))')
-    assert len(fixture.pending_check) == 1
-    fixture.pending_check.pop().fulfill(json=fixture.checked('correct'))
-    fixture.hold_check = False
-    expect(ai_card).to_contain_text('Верно')
-    expect(check_button(ai_card)).to_be_enabled()
-    answer_field(ai_card).fill('1')
-    check_button(ai_card).click()
-    expect(ai_card).to_contain_text('Неверно')
-    fixture.next_check_error = True
-    check_button(ai_card).click()
-    expect(ai_card).to_contain_text('Проверка временно недоступна.')
-    expect(check_button(ai_card)).to_be_enabled()
-    expect(answer_field(ai_card)).to_have_value('1')
-    print('PASS browser: simulated AI generation, request locking, escaped model text and decimal answer UI')
-
-    first_id = fixture.variants[0]['tasks'][0]['id']
-    second_id = fixture.variants[0]['tasks'][1]['id']
-    ai_card.locator('[data-task-action="discuss"]').click()
-    ai_page.fill('#chat-input', 'Почему нужно делить числитель?')
-    ai_page.click('#chat-send')
-    expect(ai_page.locator('#chat-messages')).to_contain_text('Почему нужно делить числитель?')
+    ai_page.locator('#generator-form').evaluate('(f)=>f.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true}))')
+    assert len(fixture.pending_generate)==1
+    route=fixture.pending_generate.pop();fixture.hold_generate=False
+    route.fulfill(json={'variant':fixture.variant(route.request.post_data_json['config'])})
+    expect(ai_page.locator('#settings-dialog')).not_to_be_visible()
+    expect(ai_page.locator('#task-question')).to_contain_text('<img src=x')
+    assert ai_page.locator('#task-question img').count()==0
+    fixture.hold_check=True;send_answer(ai_page,'0,5')
+    expect(ai_page.locator('#chat-send')).to_be_disabled()
+    ai_page.locator('#chat-form').evaluate('(f)=>f.dispatchEvent(new Event("submit",{bubbles:true,cancelable:true}))')
+    assert len(fixture.pending_check)==1
+    fixture.pending_check.pop().fulfill(json=fixture.checked('correct'));fixture.hold_check=False
+    expect(ai_page.locator('.verdict-label').last).to_have_text('Верно')
+    send_answer(ai_page,'1');expect(ai_page.locator('.verdict-label').last).to_have_text('Неверно')
+    fixture.next_check_error=True;ai_page.click('#chat-send')
+    expect(ai_page.locator('#chat-error')).to_contain_text('Проверка временно недоступна')
+    expect(ai_page.locator('#chat-input')).to_have_value('1');expect(ai_page.locator('#chat-send')).to_be_enabled()
+    first_id=fixture.variants[0]['tasks'][0]['id'];second_id=fixture.variants[0]['tasks'][1]['id']
+    ai_page.click('#mode-question');ai_page.fill('#chat-input','Почему нужно делить числитель?');ai_page.click('#chat-send')
     expect(ai_page.locator('#chat-messages')).to_contain_text('Сначала определи')
-    assert any(path == f'/api/tasks/{first_id}/chat' for path, _ in fixture.calls)
-    assert ai_page.locator('#chat-messages script').count() == 0, 'Assistant text cannot inject markup'
-    ai_page.locator('[data-chat-action="hint"]').click()
-    expect(ai_page.locator('#chat-messages')).to_contain_text('Начни с преобразования')
-    ai_page.locator('[data-chat-action="simpler"]').click()
+    assert ai_page.locator('#chat-messages script').count()==0
+    ai_page.locator('[data-chat-action="hint"]').click();expect(ai_page.locator('#chat-messages')).to_contain_text('Начни с преобразования')
     expect(ai_page.locator('#chat-send')).to_be_enabled()
-    assert any(path == f'/api/tasks/{first_id}/chat' and body.get('action') == 'simpler' for path, body in fixture.calls)
-    ai_page.select_option('#chat-task', index=1)
+    ai_page.locator('[data-chat-action="simpler"]').click();expect(ai_page.locator('#chat-send')).to_be_enabled()
+    assert any(path==f'/api/tasks/{first_id}/chat' and body.get('action')=='simpler' for path,body in fixture.calls)
+    ai_page.locator(f'[data-select-task="{second_id}"]').click()
     expect(ai_page.locator('#chat-messages')).not_to_contain_text('Почему нужно делить числитель?')
-    ai_page.fill('#chat-input', 'Объясни второе задание.')
-    ai_page.click('#chat-send')
+    ai_page.click('#mode-question');ai_page.fill('#chat-input','Объясни второе задание.');ai_page.click('#chat-send')
     expect(ai_page.locator('#chat-messages')).to_contain_text('Объясни второе задание.')
-    expect(ai_page.locator('#chat-send')).to_be_enabled()
-    assert any(path == f'/api/tasks/{second_id}/chat' for path, _ in fixture.calls)
-    ai_page.select_option('#chat-task', index=0)
+    ai_page.locator(f'[data-select-task="{first_id}"]').click()
     expect(ai_page.locator('#chat-messages')).to_contain_text('Почему нужно делить числитель?')
-    assert not any(path.endswith('/solution') for path, _ in fixture.calls)
-    ai_page.locator('[data-chat-action="solution"]').click()
-    expect(ai_card.locator('.task-solution')).to_be_visible()
-    expect(ai_card.locator('.task-solution')).to_contain_text('Одна из двух равных частей')
-    assert sum(path.endswith('/solution') for path, _ in fixture.calls) == 1
-    print('PASS browser: task-bound chat, history switching, hint/simpler/explicit-solution actions and safe assistant text')
-
-    fixture.hold_generate = True
-    ai_page.click('#regenerate')
+    assert not any(path.endswith('/solution') for path,_ in fixture.calls)
+    ai_page.locator('[data-chat-action="solution"]').click();expect(ai_page.locator('.solution-content')).to_contain_text('Одна из двух равных частей')
+    ai_page.click('#new-dialog');fixture.hold_generate=True;ai_page.click('#generate-button')
     expect(ai_page.locator('#generation-status')).to_be_visible()
-    fixture.pending_generate.pop().fulfill(status=502, json={'error': 'Сервис ИИ временно недоступен.'})
-    fixture.hold_generate = False
+    fixture.pending_generate.pop().fulfill(status=502,json={'error':'Сервис ИИ временно недоступен.'});fixture.hold_generate=False
     expect(ai_page.locator('#generation-error')).to_have_text('Сервис ИИ временно недоступен.')
     expect(ai_page.locator('#generate-button')).to_be_enabled()
-    expect(ai_page.locator('.task-card')).to_have_count(2)
-    ai_page.locator('[data-chat-action="similar"]').click()
-    expect(ai_page.locator('.task-card')).to_have_count(1)
-    assert fixture.variants[0]['config']['count'] == 1
-    assert fixture.variants[0]['config']['topic'] == 'complex'
-    assert fixture.variants[0]['source'] == 'ai'
+    ai_page.locator('#settings-dialog [data-close]').click()
+    expect(ai_page.locator('[data-select-task]')).to_have_count(2)
+    ai_page.click('#new-dialog');fixture.hold_generate=True;ai_page.click('#generate-button')
+    expect(ai_page.locator('#generate-button')).to_be_disabled()
+    ai_page.keyboard.press('Escape')
+    expect(ai_page.locator('#settings-dialog')).not_to_be_visible()
+    expect(ai_page.locator('#new-dialog')).to_be_disabled()
+    fixture.pending_generate.pop().fulfill(status=502,json={'error':'Сервис не ответил.'});fixture.hold_generate=False
+    expect(ai_page.locator('#app-error')).to_have_text('Сервис не ответил.')
+    expect(ai_page.locator('#new-dialog')).to_be_enabled()
+    expect(ai_page.locator('[data-select-task]')).to_have_count(2)
+    ai_page.locator('[data-chat-action="similar"]').click();expect(ai_page.locator('[data-select-task]')).to_have_count(1)
+    assert fixture.variants[0]['config']['count']==1 and fixture.variants[0]['source']=='ai'
+    assert not errors,errors
+    print('PASS browser: mocked AI locking/errors/safe text, answer/question routing, task-bound chat and all quick actions')
+    for blocked_getter in (True, False):
+        guarded = browser.new_context(viewport={'width':390,'height':844})
+        if blocked_getter:
+            guarded.add_init_script("Object.defineProperty(window,'localStorage',{get(){throw new DOMException('blocked','SecurityError')}})")
+        else:
+            guarded.add_init_script("Object.defineProperty(window,'localStorage',{value:Object.freeze({getItem(){return null},setItem(){throw Error('readonly')},removeItem(){throw Error('readonly')}})})")
+        guarded_fixture = SimulatedAPI()
+        protected_variant = guarded_fixture.variant({'topic':'python','level':'easy','count':1})
+        protected_variant['tasks'][0]['question'] = 'Что выведет программа?\nprint("<img src=x onerror=alert(1)>")'
+        guarded.route('**/api/**',guarded_fixture.route)
+        guarded_page = guarded.new_page()
+        guarded_page.on('pageerror',lambda error:errors.append(str(error)))
+        guarded_page.goto(BASE)
+        expect(guarded_page.locator('.code-block')).to_contain_text('<img src=x')
+        assert guarded_page.locator('.code-block img').count() == 0
+        guarded_page.fill('#chat-input','черновик')
+        guarded_page.click('#mode-question')
+        guarded_page.fill('#chat-input','первая строка')
+        before = len(guarded_fixture.calls)
+        guarded_page.locator('#chat-input').press('Shift+Enter')
+        assert '\n' in guarded_page.locator('#chat-input').input_value()
+        assert len(guarded_fixture.calls) == before, 'Shift+Enter must not send a request'
+        assert not guarded_page.evaluate('() => document.documentElement.scrollWidth > innerWidth')
+        guarded.close()
     assert not errors, errors
-    print('PASS browser: provider error preserves current tasks, restores controls and similar task starts a new variant')
+    print('PASS browser: blocked/readonly storage, safe Python code text and Shift+Enter')
     browser.close()

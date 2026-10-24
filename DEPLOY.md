@@ -15,7 +15,7 @@
 
 | Поле | Что указать |
 | --- | --- |
-| Name | Любое свободное имя, например `praktikum-assistant` |
+| Name | Любое свободное имя, например `examen-plus` |
 | Branch | `main` |
 | Root Directory | Оставить пустым — корень репозитория |
 | Runtime | Node |
@@ -62,8 +62,8 @@
 Если установлен Docker:
 
 ```bash
-docker build -t praktikum .
-docker run --rm -p 127.0.0.1:8000:8000 praktikum
+docker build -t examen-plus .
+docker run --rm -p 127.0.0.1:8000:8000 examen-plus
 ```
 
 На своём компьютере открой `http://localhost:8000`. Без переданного API-подключения доступен режим шаблонов. Для ИИ передай серверные переменные средствами Docker или подключи локальный `.env.connection.json` только для чтения по пути `/app/.env.connection.json`. Не добавляй ключ в Dockerfile.
