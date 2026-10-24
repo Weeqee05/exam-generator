@@ -136,9 +136,9 @@ test('invalid inputs, content types and cross-origin requests do not call the pr
 });
 
 test('provider failures are useful and never leak credentials or provider response bodies',async t=>{
-  for(const code of [401,402,403,404,429,500])await t.test(String(code),async t=>{
+  for(const code of [401,402,403,404,429,500,524])await t.test(String(code),async t=>{
     const app=await running(t,{settings,fetchModel:async()=>new Response('provider secret '+settings.LLM_API_KEY,{status:code})});
-    const response=await app.post();assert.equal(response.status,code===429?429:502);
+    const response=await app.post();assert.equal(response.status,code===524?504:code===429?429:502);
     const text=await response.text();assert.ok(!text.includes(settings.LLM_API_KEY));assert.match(text,/error/);
   });
 });
@@ -181,7 +181,7 @@ test('Qwen SSE handles split UTF-8, CRLF and multiline data while excluding reas
   // One-byte network chunks deliberately split both UTF-8 characters and SSE boundaries.
   const chunks=Array.from(bytes,byte=>Uint8Array.of(byte));
   let requested;
-  const app=await running(t,{settings:qwenSettings,fetchModel:async(_url,init)=>{requested=JSON.parse(init.body);return streamed(chunks);}});
+  const app=await running(t,{settings:{...qwenSettings,LLM_MODEL:'qwen3.8-27b'},fetchModel:async(_url,init)=>{requested=JSON.parse(init.body);return streamed(chunks);}});
   const response=await app.post();
   assert.equal(response.status,200);
   const data=await response.json();assertPublicVariant(data,unicodeResult);
@@ -240,7 +240,7 @@ test('imported New API connection works with a root URL and overrides incorrect 
   assert.equal(received.url,'https://sharellm.net/v1/chat/completions');
   assert.equal(received.init.headers.Authorization,'Bearer '+imported.key);
   assert.equal(JSON.parse(received.init.body).model,'qwen3.8-27b');
-  assert.equal(JSON.parse(received.init.body).stream,false);
+  assert.equal(JSON.parse(received.init.body).stream,true);
   assert.equal(loaded.HOST,'127.0.0.1');
   assert.deepEqual(await loadProviderSettings(settings,join(folder,'missing.json')),settings);
   assert.equal((await app.get('/.env.connection.json')).status,404);

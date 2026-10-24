@@ -179,7 +179,7 @@ export function createModelClient(settings, fetchModel = globalThis.fetch) {
   const base = normalizeBase(settings.LLM_BASE_URL?.trim() || DEFAULT_BASE_URL);
   const model = settings.LLM_MODEL?.trim() || defaultModel(base);
   const endpoint = base && base + '/chat/completions';
-  const stream = base === SHARELLM_BASE_URL && model === LEGACY_STREAM_MODEL;
+  const stream = base === SHARELLM_BASE_URL && [SHARELLM_MODEL,LEGACY_STREAM_MODEL].includes(model);
   const ready = Boolean(key && model && endpoint);
   async function ask(messages, {maxTokens = 8000, timeoutMs = 240000} = {}) {
     if (!ready) throw new RequestError(503, 'ИИ пока не подключён. Выбери обычную практику.');
@@ -207,6 +207,7 @@ export function createModelClient(settings, fetchModel = globalThis.fetch) {
       if (response.status === 402) throw new RequestError(502, 'Сервис ИИ отклонил запрос: администратору нужно проверить баланс.');
       if (response.status === 404) throw new RequestError(502, 'Модель или адрес API не найдены. Администратору нужно проверить настройки ИИ.');
       if (response.status === 503) throw new RequestError(503, 'Сервис ИИ временно недоступен. Попробуй позже или выбери обычную практику.');
+      if (response.status === 524) throw new RequestError(504, 'Сервис ИИ слишком долго ждёт ответа модели. Попробуй позже или выбери другую модель.');
       throw new RequestError(502, 'Сервис ИИ не ответил. Попробуй позже.');
     }
     const streaming = response.headers.get('content-type')?.toLowerCase().startsWith('text/event-stream');

@@ -1,6 +1,6 @@
 import {topicName, LEVELS, validConfig} from '../dist/generator.mjs';
 
-const mathRule = String.raw`Для формул используй LaTeX между \( и \), а отдельную строку формулы заключай в \[ и \]. Степени записывай как x^{2}, дроби как \frac{1}{2}, корни как \sqrt{x}. В JSON экранируй обратные слеши. Пример поля: ${JSON.stringify({question:'Реши \\(x^{2} - 4x = 0\\).'})}. Краткий числовой answer оставляй числом или дробью без разметки.`;
+const mathRule = String.raw`Для формул используй LaTeX между \( и \), а отдельную строку формулы заключай в \[ и \]. Степени записывай как x^{2}, дроби как \frac{1}{2}, корни как \sqrt{x}. В JSON экранируй обратные слеши. Пример поля: ${JSON.stringify({question:'Реши \\(x^{2} - 4x = 0\\).'})}. Поле answer всегда строка: для краткого числового ответа запиши строку вроде "5" или "1/2", без математических разделителей. Комплексный ответ запиши строкой вроде "3 + 2i".`;
 
 // Experiment with this prompt independently of checking and tutoring prompts.
 export function generationMessages(config, number, similarQuestion = '') {

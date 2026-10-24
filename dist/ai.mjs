@@ -7,6 +7,10 @@ export function validateModelResult(data, config) {
   }
   const fields = ['type', 'question', 'hint', 'answer', 'explanation'];
   const tasks = data.tasks.map(task => {
+    // JSON models sometimes use 5 instead of "5". Normalize only safe answers,
+    // never incomplete fields, objects or numbers already rounded by JSON.
+    if (task && typeof task.answer === 'number' && Number.isFinite(task.answer)
+        && Math.abs(task.answer) <= Number.MAX_SAFE_INTEGER) task={...task,answer:String(task.answer)};
     if (!task || fields.some(key => typeof task[key] !== 'string' || !task[key].trim() || task[key].length > (key === 'type' ? 100 : 8000))) {
       throw new Error('В ответе модели отсутствует условие, подсказка или решение. Попробуй ещё раз.');
     }

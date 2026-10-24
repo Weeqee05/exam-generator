@@ -42,6 +42,17 @@ function publicOnly(variant) {
   }
 }
 
+test('a JSON number from the model becomes a private reference and can be checked without another AI call',async t=>{
+  let calls=0;const parameters={...config,topic:'algebra'};
+  const numeric={...reference,question:'Вычисли сумму 2 + 3.',answer:5,explanation:'2 + 3 = 5.'};
+  const app=(await harness(t,{settings,fetchModel:async()=>{calls++;return modelResponse(generated([numeric],parameters));}})).client();
+  const response=await app.generate('ai',parameters);assert.equal(response.status,200);
+  const {variant}=await response.json();publicOnly(variant);
+  const checked=await(await app.action(variant.tasks[0].id,'respond',{message:'5,0'})).json();
+  assert.equal(checked.verdict,'correct');assert.equal(checked.method,'code');assert.equal(calls,1);
+  const revealed=await(await app.action(variant.tasks[0].id,'solution')).json();assert.equal(revealed.answer,'5');
+});
+
 test('a question without an AI key receives guidance rather than a missing-answer grade',async t=>{
   const app=(await harness(t)).client();const {variant}=await(await app.generate()).json();
   const result=await(await app.action(variant.tasks[0].id,'respond',{message:'Как начать решение?'})).json();
