@@ -685,11 +685,18 @@ h1 {
 }
 
 .session-topic h3 {
+  min-width: 0;
+  overflow-wrap: anywhere;
   font-size: 19px;
   line-height: 1.45;
   letter-spacing: -.5px;
   margin: 0;
   font-weight: 600;
+}
+
+#context-label {
+  min-width: 0;
+  overflow-wrap: anywhere;
 }
 
 .session-meta {
@@ -1143,6 +1150,7 @@ input[type=number] {
 }
 
 .history-entry h3 {
+  overflow-wrap: anywhere;
   font-size: 13px;
   margin-bottom: 5px;
 }

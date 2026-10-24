@@ -2,7 +2,7 @@ import * as http from 'node:http';
 import {readFile} from 'node:fs/promises';
 import {randomBytes} from 'node:crypto';
 import {pathToFileURL} from 'node:url';
-import {validConfig, makeTasks} from './dist/generator.mjs';
+import {validConfig, hasTemplates, makeTasks} from './dist/generator.mjs';
 import {validateModelResult} from './dist/ai.mjs';
 import {plainText} from './dist/export.mjs';
 import {RequestError, readLimited} from './server/errors.mjs';
@@ -178,14 +178,18 @@ export function createApp({settings = process.env, fetchModel = globalThis.fetch
         const input = await readInput(req);
         const source = input.source ?? 'ai';
         if (!validConfig(input.config) || !Number.isSafeInteger(input.variantId) || input.variantId < 1 || !['local', 'ai'].includes(source)) {
-          throw new RequestError(400, 'Проверь тему, сложность и количество заданий.');
+          throw new RequestError(400, 'Проверь тему, сложность и количество заданий. Своя тема должна содержать от 2 до 160 символов в одной строке.');
         }
+        if (source === 'local' && !hasTemplates(input.config.topic)) throw new RequestError(400, 'Для этой темы выбери ИИ-ассистента. Шаблоны доступны для комплексных чисел, множеств и Python.');
+        // Store only supported settings; custom text is a subject, never an instruction.
+        const {topic, level, count} = input.config;
+        const config = {topic, level, count, ...(topic === 'custom' ? {customTopic:input.config.customTopic.trim()} : {})};
         const provider = input.provider ?? models.defaultProvider;
         const model = selectModel(provider);
         if (source === 'ai' && !model.ready) throw new RequestError(503, 'ИИ пока не подключён. Выбери обычную практику.');
         limit(req);
         const owner = ownerFor(req, res, true);
-        const variant = await generate(req, owner, input.config, input.variantId, source, provider);
+        const variant = await generate(req, owner, config, input.variantId, source, provider);
         return send(res, 200, {variant});
       }
       const taskRoute = path.match(/^\/api\/tasks\/([a-zA-Z0-9-]{1,100})\/(check|hint|solution|chat|similar|respond)$/);

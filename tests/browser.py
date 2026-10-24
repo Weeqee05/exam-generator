@@ -176,6 +176,18 @@ with sync_playwright() as playwright:
             value=response.json(); assert_public(value); public_responses.append(value)
     page.on('response',capture_public)
     page.goto(BASE)
+    page.click('#new-dialog')
+    assert page.locator('#topic option[value="custom"]').is_disabled()
+    assert page.locator('#topic option[value="physics"]').is_disabled()
+    expect(page.locator('#custom-topic-field')).not_to_be_visible()
+    page.keyboard.press('Escape')
+    page.click('[data-topic="custom"]')
+    expect(page.locator('#source-description')).to_contain_text('подключи Gemini или Qwen')
+    expect(page.locator('#generate-button')).to_be_disabled()
+    page.select_option('#topic','complex')
+    expect(page.locator('#source')).to_have_value('local')
+    expect(page.locator('#generate-button')).to_be_enabled()
+    page.keyboard.press('Escape')
     expect(page).to_have_title(re.compile('Экзамен\\+'))
     expect(page.locator('#welcome')).to_be_visible()
     expect(page.locator('#chat-send')).to_be_disabled()
@@ -317,6 +329,48 @@ with sync_playwright() as playwright:
     assert fixture.variants[0]['config']['count']==1 and fixture.variants[0]['source']=='ai'
     assert not errors,errors
     print('PASS browser: mocked AI locking/errors/safe text, automatic routing and model selection, task-bound chat and all quick actions')
+    ai_page.click('#new-dialog');ai_page.select_option('#topic','custom')
+    expect(ai_page.locator('#custom-topic-field')).to_be_visible()
+    expect(ai_page.locator('#source')).to_have_value('ai')
+    expect(ai_page.locator('#source')).to_be_disabled()
+    calls_before=len(fixture.calls)
+    ai_page.fill('#custom-topic','');ai_page.click('#generate-button')
+    assert len(fixture.calls)==calls_before, 'Empty subject must not reach API'
+    ai_page.fill('#custom-topic','   ');ai_page.click('#generate-button')
+    expect(ai_page.locator('#generation-error')).to_contain_text('Укажи тему')
+    assert len(fixture.calls)==calls_before
+    subject='Биология <img src=x onerror=alert(1)> ' + 'ДНК'*30
+    ai_page.fill('#custom-topic',subject);ai_page.fill('#count','1');ai_page.click('#generate-button')
+    expect(ai_page.locator('#settings-dialog')).not_to_be_visible()
+    expect(ai_page.locator('#session-topic')).to_have_text(subject)
+    assert ai_page.locator('#session-topic img').count()==0
+    custom_config=fixture.variants[0]['config']
+    assert custom_config['topic']=='custom' and custom_config['customTopic']==subject
+    ai_page.reload();expect(ai_page.locator('#session-topic')).to_have_text(subject)
+    ai_page.click('#nav-history');ai_page.fill('#history-search','Биология')
+    expect(ai_page.locator('.history-entry h3')).to_contain_text(subject)
+    assert ai_page.locator('#history-list img').count()==0
+    ai_page.locator('[data-load]').first.click()
+    with ai_page.expect_download() as custom_download:
+        ai_page.click('#download-variant')
+    assert subject in Path(custom_download.value.path()).read_text(encoding='utf-8-sig')
+    for width in (320,390,768,1024,1440):
+        ai_page.set_viewport_size({'width':width,'height':1000})
+        assert not ai_page.evaluate('() => document.documentElement.scrollWidth > innerWidth'), f'Custom subject overflow {width}'
+        ai_page.click('#new-dialog')
+        expect(ai_page.locator('#custom-topic')).to_have_value(subject)
+        assert not ai_page.evaluate('() => document.documentElement.scrollWidth > innerWidth'), f'Custom dialog overflow {width}'
+        ai_page.keyboard.press('Escape')
+    ai_page.locator('[data-chat-action="similar"]').click()
+    expect(ai_page.locator('#session-topic')).to_have_text(subject)
+    assert fixture.variants[0]['config']['customTopic']==subject
+    ai_page.click('#new-dialog');ai_page.select_option('#topic','physics')
+    expect(ai_page.locator('#custom-topic-field')).not_to_be_visible()
+    ai_page.click('#generate-button')
+    expect(ai_page.locator('#session-topic')).to_have_text('Физика')
+    assert 'customTopic' not in fixture.variants[0]['config']
+    assert not errors,errors
+    print('PASS browser: custom subjects, empty input, AI-only presets, reload/history/export, safe titles and 320–1440px')
     for blocked_getter in (True, False):
         guarded = browser.new_context(viewport={'width':390,'height':844})
         if blocked_getter:

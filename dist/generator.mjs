@@ -1,7 +1,15 @@
 export const TOPICS = {
-  complex: {name:'Комплексные числа', description:'Арифметика, степени и уравнения'},
-  sets: {name:'Множества и отношения', description:'Операции, мощности и свойства отношений'},
-  python: {name:'Python: основы и алгоритмы', description:'Циклы, списки и разбор кода'}
+  complex: {name:'Комплексные числа', description:'Арифметика, степени и уравнения', templates:true},
+  sets: {name:'Множества и отношения', description:'Операции, мощности и свойства отношений', templates:true},
+  python: {name:'Python: основы и алгоритмы', description:'Циклы, списки и разбор кода', templates:true},
+  algebra: {name:'Алгебра', description:'Уравнения, неравенства и преобразование выражений'},
+  calculus: {name:'Производные и интегралы', description:'Пределы, дифференцирование и интегрирование'},
+  linear: {name:'Линейная алгебра', description:'Матрицы, векторы и системы линейных уравнений'},
+  probability: {name:'Теория вероятностей', description:'События, комбинаторика и вычисление вероятностей'},
+  sql: {name:'SQL и базы данных', description:'Запросы, фильтрация, группировка и связи таблиц'},
+  physics: {name:'Физика', description:'Механика, электричество и задачи с единицами измерения'},
+  history: {name:'История', description:'События, хронология и объяснение причин'},
+  custom: {name:'Своя тема', description:'Напиши предмет и раздел, по которому хочешь потренироваться'}
 };
 export const LEVELS = {
   easy: {name:'Базовый', description:'Чтобы разобраться в основах', minutes:3},
@@ -9,8 +17,11 @@ export const LEVELS = {
   hard: {name:'Сложный', description:'Сочетание приёмов и рассуждение', minutes:8}
 };
 export function validConfig(c) {
-  return !!c && Object.hasOwn(TOPICS,c.topic) && Object.hasOwn(LEVELS,c.level) && Number.isInteger(c.count) && c.count>=1 && c.count<=10;
+  return !!c && typeof c.topic === 'string' && Object.hasOwn(TOPICS,c.topic) && Object.hasOwn(LEVELS,c.level) && Number.isInteger(c.count) && c.count>=1 && c.count<=10
+    && (c.topic !== 'custom' || (typeof c.customTopic === 'string' && c.customTopic.trim().length >= 2 && c.customTopic.length <= 160 && !/[\u0000-\u001f\u007f]/u.test(c.customTopic)));
 }
+export const hasTemplates = topic => Object.hasOwn(TOPICS, topic) && TOPICS[topic].templates === true;
+export const topicName = config => config.topic === 'custom' ? config.customTopic.trim() : TOPICS[config.topic].name;
 export function rng(seed) {
   let a=seed>>>0;
   return () => {a+=0x6D2B79F5;let t=a;t=Math.imul(t^(t>>>15),t|1);t^=t+Math.imul(t^(t>>>7),t|61);return ((t^(t>>>14))>>>0)/4294967296;};
@@ -76,6 +87,7 @@ function pythonTask(level,family,int,choose) {
 
 export function makeTasks(config,seed) {
   if(!validConfig(config)) throw new RangeError('Недопустимые параметры варианта');
+  if(!hasTemplates(config.topic)) throw new RangeError('Для этой темы нужна генерация через ИИ.');
   const random=rng(seed),int=(a,b)=>Math.floor(random()*(b-a+1))+a,choose=a=>a[int(0,a.length-1)];
   const make={complex:complexTask,sets:setsTask,python:pythonTask}[config.topic];
   const tasks=[],seen=new Set(),offset=int(0,2);
@@ -89,5 +101,5 @@ export function makeTasks(config,seed) {
 export function buildPrompt(config,variantId) {
   if(!validConfig(config)) throw new RangeError('Недопустимые параметры промпта');
   const difficulty={easy:'одно основное действие; прямое применение определения или формулы',medium:'несколько последовательных действий; выбор подходящего приёма',hard:'сочетание приёмов; обоснование или анализ алгоритма'};
-  return `РОЛЬ\nТы — преподаватель и репетитор студента первого курса.\n\nКОНТЕКСТ\nПодготовка к экзамену. Тема: «${TOPICS[config.topic].name}». Вариант №${String(variantId).padStart(3,'0')}.\n\nЗАДАЧА\nСоздай ровно ${config.count} различных практических заданий.\nСложность: ${LEVELS[config.level].name.toLowerCase()} — ${difficulty[config.level]}.\n\nТРЕБОВАНИЯ\n• Условия должны быть однозначными и самодостаточными.\n• Измени числовые параметры и используй разные типы заданий.\n• Для каждого задания дай одну направляющую подсказку, точный ответ и объяснение по шагам.\n• Подсказка не должна раскрывать готовый ответ.\n• Проверь вычисления и соответствие уровню сложности.\n• Пиши по-русски, понятно первокурснику.\n\nФОРМАТ ОТВЕТА\nВерни только JSON, без Markdown и без пояснений вне JSON:\n{\n  "topic": "${config.topic}",\n  "difficulty": "${config.level}",\n  "tasks": [\n    {\n      "type": "тип задания",\n      "question": "условие",\n      "hint": "подсказка",\n      "answer": "точный ответ",\n      "explanation": "пошаговое решение"\n    }\n  ]\n}\n\nПеред ответом проверь: tasks содержит ровно ${config.count} объектов; задания не повторяются; у каждого задания заполнены все пять полей.`;
+  return `РОЛЬ\nТы — преподаватель и репетитор студента первого курса.\n\nКОНТЕКСТ\nПодготовка к экзамену. Тема: «${topicName(config)}». Вариант №${String(variantId).padStart(3,'0')}.\n\nЗАДАЧА\nСоздай ровно ${config.count} различных практических заданий.\nСложность: ${LEVELS[config.level].name.toLowerCase()} — ${difficulty[config.level]}.\n\nТРЕБОВАНИЯ\n• Условия должны быть однозначными и самодостаточными.\n• Измени числовые параметры и используй разные типы заданий.\n• Для каждого задания дай одну направляющую подсказку, точный ответ и объяснение по шагам.\n• Подсказка не должна раскрывать готовый ответ.\n• Проверь вычисления и соответствие уровню сложности.\n• Пиши по-русски, понятно первокурснику.\n\nФОРМАТ ОТВЕТА\nВерни только JSON, без Markdown и без пояснений вне JSON:\n{\n  "topic": "${config.topic}",\n  "difficulty": "${config.level}",\n  "tasks": [\n    {\n      "type": "тип задания",\n      "question": "условие",\n      "hint": "подсказка",\n      "answer": "точный ответ",\n      "explanation": "пошаговое решение"\n    }\n  ]\n}\n\nПеред ответом проверь: tasks содержит ровно ${config.count} объектов; задания не повторяются; у каждого задания заполнены все пять полей.`;
 }

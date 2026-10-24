@@ -1,4 +1,4 @@
-import {TOPICS, LEVELS} from './generator.mjs';
+import {topicName, LEVELS} from './generator.mjs';
 
 export function plainText(html) {
   return html.replace(/<sup>(.*?)<\/sup>/g, '^($1)').replace(/<br\s*\/?\s*>|<\/?pre>|<\/p>/gi, '\n')
@@ -6,7 +6,7 @@ export function plainText(html) {
 }
 
 export function exportVariant(variant, tasks, includeAnswers = false) {
-  const lines = ['ЭКЗАМЕН+ · Вариант ' + String(variant.id).padStart(3, '0'), `${TOPICS[variant.config.topic].name} · ${LEVELS[variant.config.level].name}`, `Создан: ${new Date(variant.created).toLocaleDateString('ru-RU')}`, `Источник: ${variant.source === 'ai' ? 'Языковая модель. Ответы требуют самостоятельной проверки.' : 'Локальные шаблоны'}`, ''];
+  const lines = ['ЭКЗАМЕН+ · Вариант ' + String(variant.id).padStart(3, '0'), `${topicName(variant.config)} · ${LEVELS[variant.config.level].name}`, `Создан: ${new Date(variant.created).toLocaleDateString('ru-RU')}`, `Источник: ${variant.source === 'ai' ? 'Языковая модель. Ответы требуют самостоятельной проверки.' : 'Локальные шаблоны'}`, ''];
   tasks.forEach((task, index) => {
     lines.push(`ЗАДАНИЕ ${index + 1}. ${task.tag}`, plainText(task.question), '');
     if (includeAnswers) lines.push('Подсказка: ' + plainText(task.hint), 'Ответ: ' + plainText(task.answer), 'Решение: ' + plainText(task.explanation), '');

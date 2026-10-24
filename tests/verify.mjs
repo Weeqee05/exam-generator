@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import {spawnSync} from 'node:child_process';
-import {TOPICS,LEVELS,makeTasks,buildPrompt,validConfig} from '../dist/generator.mjs';
+import {TOPICS,LEVELS,hasTemplates,makeTasks,buildPrompt,validConfig} from '../dist/generator.mjs';
 
 const pythonCases=[];
 let variants=0,checkedTasks=0;
@@ -34,7 +34,7 @@ function verify(t) {
   }
   checkedTasks++;
 }
-for(const topic of Object.keys(TOPICS))for(const level of Object.keys(LEVELS))for(const count of [1,5,10])for(let seed=0;seed<35;seed++){
+for(const topic of Object.keys(TOPICS).filter(hasTemplates))for(const level of Object.keys(LEVELS))for(const count of [1,5,10])for(let seed=0;seed<35;seed++){
   const c={topic,level,count},tasks=makeTasks(c,seed);
   assert.equal(tasks.length,count);assert.equal(new Set(tasks.map(t=>t.question)).size,count);
   assert.deepEqual(tasks,makeTasks(c,seed));tasks.forEach(verify);

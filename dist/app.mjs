@@ -1,5 +1,5 @@
 import {feedbackParagraphs} from './dialogue.mjs';
-import {TOPICS, LEVELS, validConfig, escapeHtml} from './generator.mjs';
+import {TOPICS, LEVELS, validConfig, hasTemplates, topicName, escapeHtml} from './generator.mjs';
 
 // Only the selected variant id and the student's drafts are persisted here.
 // Reference answers and solutions are owned by the server.
@@ -41,7 +41,7 @@ export function mountApp(doc, storage, env = {}) {
   let providers = [], activeProvider = saved.preferredProvider || 'gemini';
   let toastTimer, storageWarned = false;
   const conversations = new Map(), solutions = new Map();
-  const shortTopics = {complex:'Комплексные числа', sets:'Множества и отношения', python:'Python: основы'};
+  $('topic').innerHTML = Object.entries(TOPICS).map(([id, topic]) => `<option value="${id}">${escapeHtml(topic.name)}</option>`).join('');
   const icon = name => `<svg aria-hidden="true"><use href="#i-${name}"/></svg>`;
   const selectedTask = () => current?.tasks.find(task => task.id === selectedTaskId);
   const taskPath = action => '/api/tasks/' + encodeURIComponent(selectedTaskId) + '/' + action;
@@ -71,12 +71,27 @@ export function mountApp(doc, storage, env = {}) {
     return result;
   }
   function configFromForm() {
-    return {topic:$('topic').value, level:doc.querySelector('input[name="level"]:checked').value, count:Number($('count').value)};
+    const topic = $('topic').value;
+    return {topic, level:doc.querySelector('input[name="level"]:checked').value, count:Number($('count').value), ...(topic === 'custom' ? {customTopic:$('custom-topic').value.trim()} : {})};
   }
   function updateSettings() {
+    const topic = $('topic').value, aiOnly = !hasTemplates(topic), custom = topic === 'custom';
+    $('custom-topic-field').hidden = !custom;
+    $('custom-topic').required = custom;
+    $('custom-topic').disabled = busy || !custom;
+    for (const option of $('topic').options) {
+      option.disabled = !aiAvailable && !hasTemplates(option.value);
+      option.textContent = TOPICS[option.value].name + (!aiAvailable && !hasTemplates(option.value) ? ' — нужен ИИ' : '');
+    }
+    $('ai-option').disabled = !aiAvailable;
+    $('local-option').disabled = aiOnly;
+    if (aiOnly) $('source').value = 'ai';
+    else if (!aiAvailable) $('source').value = 'local';
+    $('source').disabled = busy || aiOnly;
+    $('generate-button').disabled = busy || (aiOnly && !aiAvailable);
     $('topic-description').textContent = TOPICS[$('topic').value]?.description || '';
     updateProviderState();
-    $('source-description').textContent = $('source').value === 'ai'
+    $('source-description').textContent = aiOnly && !aiAvailable ? 'Для этой темы подключи Gemini или Qwen на сервере. Три темы с шаблонами доступны без ИИ.' : $('source').value === 'ai'
       ? 'Задания создаёт модель. Ожидание может занять до четырёх минут.'
       : 'Проверенные задания со случайными числами. Их создание не требует ИИ.';
   }
@@ -88,7 +103,7 @@ export function mountApp(doc, storage, env = {}) {
     $('generator-form').setAttribute('aria-busy', String(value)); $('chat-form').setAttribute('aria-busy', String(value));
     $('request-status').hidden = !value; $('request-status-text').textContent = message;
     $('generation-status').hidden = !value; $('generation-status').textContent = message;
-    updateProviderState();
+    updateSettings();
   }
   function settings(topic) {
     if (busy) return;
@@ -158,8 +173,8 @@ export function mountApp(doc, storage, env = {}) {
   function render() {
     const task=selectedTask(); if (!task) return;
     $('welcome').hidden=true; $('thread').hidden=false; $('task-navigation').hidden=false;
-    $('context-label').textContent=`${shortTopics[current.config.topic]} · ${LEVELS[current.config.level].name}`.toLocaleUpperCase('ru-RU');
-    $('session-topic').textContent=shortTopics[current.config.topic]; $('session-level').textContent=LEVELS[current.config.level].name; $('session-count').textContent=current.tasks.length;
+    $('context-label').textContent=`${topicName(current.config)} · ${LEVELS[current.config.level].name}`.toLocaleUpperCase('ru-RU');
+    $('session-topic').textContent=topicName(current.config); $('session-level').textContent=LEVELS[current.config.level].name; $('session-count').textContent=current.tasks.length;
     $('topic-icon').innerHTML=`<use href="#i-${current.config.topic==='python'?'code':'book'}"/>`;
     $('variant-source').textContent=current.source==='ai'?'Создано ИИ':'Тренировочное задание';
     const index=current.tasks.findIndex(t=>t.id===selectedTaskId);
@@ -170,6 +185,7 @@ export function mountApp(doc, storage, env = {}) {
     current=publicVariant(value);history=[current,...history.filter(v=>v.id!==current.id)].slice(0,20);
     selectedTaskId=restoring && current.tasks.some(t=>t.id===saved.selectedTaskId) ? saved.selectedTaskId : current.tasks[0].id;
     $('topic').value=current.config.topic;$('count').value=current.config.count;
+    $('custom-topic').value=current.config.customTopic || '';
     for(const input of doc.querySelectorAll('input[name="level"]'))input.checked=input.value===current.config.level;
     render();persist();
     const validTasks=new Set(history.flatMap(v=>v.tasks.map(t=>t.id)));
@@ -179,7 +195,7 @@ export function mountApp(doc, storage, env = {}) {
     if(busy)return false;
     const provider=$('provider').value;
     const config=configFromForm(),source=$('source').value;
-    if(!validConfig(config)){$('generation-error').textContent='Выбери целое количество заданий от 1 до 10.';$('generation-error').hidden=false;return false;}
+    if(!validConfig(config)){$('generation-error').textContent='Укажи тему от 2 до 160 символов и целое количество заданий от 1 до 10.';$('generation-error').hidden=false;return false;}
     saveDraft();$('generation-error').hidden=true;$('app-error').hidden=true;
     setBusy(true,source==='ai'?'Создаём задания с ИИ. Ожидание — до четырёх минут…':'Готовим тренировочные задания…');
     try {
@@ -207,8 +223,8 @@ export function mountApp(doc, storage, env = {}) {
   }
   function renderHistory() {
     const query=$('history-search').value.trim().toLocaleLowerCase('ru-RU');
-    const entries=history.filter(v=>`${v.number} ${TOPICS[v.config.topic].name} ${LEVELS[v.config.level].name}`.toLocaleLowerCase('ru-RU').includes(query));
-    $('history-list').innerHTML=entries.length?entries.map(v=>`<div class="history-entry"><div><h3>${escapeHtml(TOPICS[v.config.topic].name)} · ${String(v.number).padStart(3,'0')}</h3><p>${LEVELS[v.config.level].name} · ${v.tasks.length} ${plural(v.tasks.length)} · верно ${v.solved.filter(Boolean).length}</p></div><button type="button" data-load="${escapeHtml(v.id)}">Открыть</button></div>`).join(''):'<p class="empty-history">Занятий не найдено. Попробуй другую тему или номер.</p>';
+    const entries=history.filter(v=>`${v.number} ${topicName(v.config)} ${LEVELS[v.config.level].name}`.toLocaleLowerCase('ru-RU').includes(query));
+    $('history-list').innerHTML=entries.length?entries.map(v=>`<div class="history-entry"><div><h3>${escapeHtml(topicName(v.config))} · ${String(v.number).padStart(3,'0')}</h3><p>${LEVELS[v.config.level].name} · ${v.tasks.length} ${plural(v.tasks.length)} · верно ${v.solved.filter(Boolean).length}</p></div><button type="button" data-load="${escapeHtml(v.id)}">Открыть</button></div>`).join(''):'<p class="empty-history">Занятий не найдено. Попробуй другую тему или номер.</p>';
   }
   async function submitMessage() {
     if(busy || !selectedTask())return;
@@ -267,7 +283,7 @@ export function mountApp(doc, storage, env = {}) {
     finally{setBusy(false);}
   }
   function exportText() {
-    return ['ЭКЗАМЕН+ · Занятие '+current.number,`${TOPICS[current.config.topic].name} · ${LEVELS[current.config.level].name}`,'',...current.tasks.flatMap((task,index)=>['ЗАДАНИЕ '+(index+1)+'. '+task.tag,task.question,''])].join('\n');
+    return ['ЭКЗАМЕН+ · Занятие '+current.number,`${topicName(current.config)} · ${LEVELS[current.config.level].name}`,'',...current.tasks.flatMap((task,index)=>['ЗАДАНИЕ '+(index+1)+'. '+task.tag,task.question,''])].join('\n');
   }
   function downloadVariant() {
     if(!current)return;

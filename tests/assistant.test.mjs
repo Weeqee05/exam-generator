@@ -42,6 +42,61 @@ function publicOnly(variant) {
   }
 }
 
+test('custom practice retains its subject through checking, conversation, history and similar tasks',async t=>{
+  const parameters={topic:'custom',customTopic:'  Вероятность — честная монета  ',level:'easy',count:1,untrustedExtra:'must not persist'};
+  const normalized={topic:'custom',customTopic:parameters.customTopic.trim(),level:'easy',count:1};
+  const requests=[];
+  const app=(await harness(t,{settings,fetchModel:async(url,options)=>{
+    requests.push(JSON.parse(options.body));
+    return modelResponse([
+      generated([reference],normalized),
+      {intent:'chat',message:'Сначала посчитай равновозможные исходы.'},
+      generated([{...reference,question:'Вычисли вероятность выпадения орла у честной монеты.'}],normalized)
+    ][requests.length-1]);
+  }})).client();
+  const response=await app.generate('ai',parameters);
+  assert.equal(response.status,200);
+  const {variant}=await response.json();publicOnly(variant);assert.deepEqual(variant.config,normalized);
+  assert.ok(requests[0].messages[1].content.includes(normalized.customTopic));
+  const id=variant.tasks[0].id;
+  assert.equal((await(await app.action(id,'respond',{message:'1'})).json()).verdict,'incorrect');
+  assert.equal((await(await app.action(id,'respond',{message:'0,5'})).json()).verdict,'correct');
+  assert.equal((await(await app.action(id,'hint')).json()).message,reference.hint);
+  const chat=await(await app.action(id,'respond',{message:'Как найти число исходов?'})).json();
+  assert.equal(chat.kind,'message');assert.match(chat.message,/исходы/);
+  const history=await(await app.get('/api/history')).json();publicOnly(history.variants[0]);
+  assert.deepEqual(history.variants[0].config,normalized);assert.deepEqual(history.variants[0].solved,[true]);
+  const solution=await(await app.action(id,'solution')).json();assert.equal(solution.answer,reference.answer);
+  const similar=await(await app.action(id,'similar')).json();publicOnly(similar.variant);
+  assert.deepEqual(similar.variant.config,normalized);assert.equal(similar.variant.source,'ai');
+  assert.ok(requests[2].messages[1].content.includes(normalized.customTopic));
+  assert.equal(requests.length,3);
+});
+
+test('new preset subjects use AI and cannot accidentally fall through to missing local templates',async t=>{
+  const app=(await harness(t,{settings,fetchModel:async(url,options)=>{
+    const body=JSON.parse(options.body);
+    const topic=JSON.parse(body.messages[1].content.match(/\{[\s\S]*\}/)[0]).topic;
+    return modelResponse(generated([reference],{...config,topic}));
+  }})).client();
+  for (const topic of ['algebra','calculus','linear','probability','sql','physics','history']) {
+    const response=await app.generate('ai',{...config,topic});assert.equal(response.status,200,topic);
+    const {variant}=await response.json();publicOnly(variant);assert.equal(variant.config.topic,topic);
+  }
+  const unsupported=await app.generate('local',{...config,topic:'physics'});
+  assert.equal(unsupported.status,400);assert.match((await unsupported.json()).error,/ИИ-ассистента/);
+});
+
+test('custom generation validates the subject and gives a useful error without an API key',async t=>{
+  let calls=0;
+  const app=(await harness(t,{fetchModel:async()=>{calls++;throw Error('no model call expected');}})).client();
+  const parameters={...config,topic:'custom',customTopic:'Биология'};
+  assert.equal((await app.generate('local',parameters)).status,400);
+  assert.equal((await app.generate('ai',parameters)).status,503);
+  for (const customTopic of ['', ' ', 'a'.repeat(161), 'История\nдругая строка', null]) assert.equal((await app.generate('ai',{...parameters,customTopic})).status,400);
+  assert.equal(calls,0);assert.equal((await(await app.get('/api/history')).json()).variants.length,0);
+});
+
 test('ordinary generation is server-side and history restores only public task data',async t=>{
   let calls=0;
   const app=(await harness(t,{fetchModel:async()=>{calls++;throw new Error('must not call model');}})).client();
