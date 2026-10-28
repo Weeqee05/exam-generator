@@ -10,6 +10,7 @@ import {RequestError, readLimited} from './server/errors.mjs';
 import {createModelRegistry, loadProviderSettings, configureRuntimeProxy} from './server/provider.mjs';
 import {createStore, publicVariant} from './server/store.mjs';
 import {checkDeterministic} from './server/checker.mjs';
+import {validateProbabilityReference} from './server/probability.mjs';
 import {safeHint, safeTutorMessage, safeFeedback} from './server/disclosure.mjs';
 import {generationMessages} from './prompts/generation.mjs';
 import {checkingMessages} from './prompts/checking.mjs';
@@ -117,8 +118,13 @@ export function createApp({settings = process.env, fetchModel = globalThis.fetch
       for(let attempt=0;attempt<2;attempt++) {
         try {
           const raw=await ask(req,model,generationMessages(config,number,similarQuestion,attempt>0),attempt ? Math.min(8000,maxTokens*2) : maxTokens);
-          try {result=validateModelResult(raw,config);}
-          catch {throw new RequestError(502,'ИИ не заполнил все задания в нужном формате. Попробуй меньше заданий или другую модель.','MODEL_VARIANT_INVALID');}
+          try {
+            result=validateModelResult(raw,config);
+            if(config.topic==='probability' && result.tasks.some((task,index)=>!validateProbabilityReference(task,raw.tasks[index].calculation))) {
+              throw new Error('Inconsistent probability reference');
+            }
+          }
+          catch {throw new RequestError(502,'ИИ вернул неполные или несогласованные задания. Попробуй меньше заданий или другую модель.','MODEL_VARIANT_INVALID');}
           break;
         } catch(error) {
           if(attempt===0 && recoverable.has(error.code) && req.assistantDeadline-Date.now()>=60000) continue;

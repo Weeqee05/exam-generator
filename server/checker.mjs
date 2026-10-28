@@ -306,6 +306,12 @@ function localExpected(proof) {
   }
 }
 
+// Bounded arithmetic for private generation checks. No code is executed.
+export function evaluateReal(source) {
+  const value = expression(source);
+  return value && isReal(value) ? value[0] : null;
+}
+
 export function checkDeterministic(task, answer) {
   if (typeof answer !== 'string' || !answer.trim()) return result('clarify', 'Введи свой ответ: число, комплексное число, множество или результат программы.');
   if (!task || typeof task.answer !== 'string' || answer.length > MAX_INPUT) return null;

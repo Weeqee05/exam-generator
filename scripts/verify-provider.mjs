@@ -11,6 +11,8 @@ const registry = createModelRegistry(settings);
 const provider = process.argv[2] || registry.defaultProvider;
 const config=process.argv.includes('--limits')
   ? {topic:'custom',customTopic:'Пределы функций',level:'medium',count:3}
+  : process.argv.includes('--probability')
+  ? {topic:'probability',level:'medium',count:3}
   : {topic:'complex',level:'easy',count:1};
 if (!registry.get(provider)?.ready) {
   console.error('Выбранная модель не настроена. Добавь её серверный ключ перед настоящей проверкой.');

@@ -189,7 +189,7 @@ test('new preset subjects use AI and cannot accidentally fall through to missing
   const app=(await harness(t,{settings,fetchModel:async(url,options)=>{
     const body=JSON.parse(options.body);
     const topic=JSON.parse(body.messages[1].content.match(/\{[\s\S]*\}/)[0]).topic;
-    return modelResponse(generated([reference],{...config,topic}));
+    return modelResponse(generated([topic==='probability' ? {...reference,calculation:'1/2',explanation:'Один исход из двух.\nОтвет: 1/2'} : reference],{...config,topic}));
   }})).client();
   for (const topic of ['algebra','calculus','linear','probability','sql','physics','history']) {
     const response=await app.generate('ai',{...config,topic});assert.equal(response.status,200,topic);
@@ -571,4 +571,33 @@ test('a standalone Qwen key can be selected without a Gemini key',async t=>{
   assert.equal(models.defaultProvider,'qwen');assert.equal(models.providers.find(p=>p.id==='gemini').available,false);
   assert.equal((await app.generate('ai')).status,200);
   assert.match(requested.url,/sharellm/);assert.equal(requested.body.model,'qwen3.8-27b');
+});
+
+test('probability generation rejects contradictory references and keeps calculations private',async t=>{
+  const parameters={topic:'probability',level:'medium',count:1};
+  const probability={type:'Полная вероятность',question:'В первой урне 3 белых и 2 чёрных шара, во второй 4 белых и 4 чёрных. Переложили шар из первой во вторую и вынули шар из второй. Найди вероятность белого шара.',hint:'Рассмотри два варианта переноса.',answer:'23/45',calculation:'(3/5)*(5/9)+(2/5)*(4/9)',explanation:'Используем формулу полной вероятности.\nОтвет: 23/45'};
+  let calls=0;
+  const app=(await harness(t,{settings,fetchModel:async()=>modelResponse(generated([{...probability,answer:++calls===1?'37/80':'23/45'}],parameters))})).client();
+  const response=await app.generate('ai',parameters);assert.equal(response.status,200);assert.equal(calls,2);
+  const {variant}=await response.json();publicOnly(variant);assert.ok(!JSON.stringify(variant).includes('calculation'));
+  const task=variant.tasks[0];
+  const checked=await(await app.action(task.id,'respond',{message:'46/90'})).json();assert.equal(checked.verdict,'correct');assert.equal(checked.method,'code');
+  const wrong=await(await app.action(task.id,'respond',{message:'37/80'})).json();assert.equal(wrong.verdict,'incorrect');
+  const solution=await(await app.action(task.id,'solution')).json();assert.equal(solution.answer,'23/45');assert.ok(!Object.hasOwn(solution,'calculation'));
+  const history=await(await app.get('/api/history')).json();assert.ok(!JSON.stringify(history).includes('calculation'));
+});
+
+test('suspended Qwen returns an actionable error without repeats or provider switches',async t=>{
+  let calls=0;
+  const app=(await harness(t,{settings:{QWEN_API_KEY:'test-qwen'},fetchModel:async()=>{calls++;return new Response(JSON.stringify({error:{code:'channel_model_suspended',message:'private provider diagnostic'}}),{status:500});}})).client();
+  const response=await app.post('/api/generate',{config,variantId:1,source:'ai',provider:'qwen'});
+  assert.equal(response.status,503);const body=await response.json();assert.equal(body.code,'MODEL_SUSPENDED');assert.match(body.error,/Gemini/);assert.ok(!JSON.stringify(body).includes('private'));assert.equal(calls,1);
+});
+
+test('repeated inconsistent probability output does not replace existing history',async t=>{
+  let calls=0;const parameters={topic:'probability',level:'easy',count:1};
+  const app=(await harness(t,{settings,fetchModel:async()=>{calls++;return modelResponse(generated([{...reference,answer:'0.6',calculation:'1/2',explanation:'Ответ: 0.6'}],parameters));}})).client();
+  await app.generate('local');
+  const response=await app.generate('ai',parameters,2);assert.equal(response.status,502);assert.equal(calls,2);assert.equal((await response.json()).code,'MODEL_VARIANT_INVALID');
+  const history=await(await app.get('/api/history')).json();assert.equal(history.variants.length,1);assert.equal(history.variants[0].source,'local');
 });

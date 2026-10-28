@@ -205,6 +205,7 @@ export function createModelClient(settings, fetchModel = globalThis.fetch) {
         code = data?.error?.code || data?.code;
       } catch {}
       if (code === 'auto_router_disabled') throw new RequestError(503, 'В ShareLLM отключён Auto Model Router. Для работы ИИ его нужно включить на стороне ShareLLM.');
+      if (code === 'channel_model_suspended') throw new RequestError(503, 'ShareLLM временно приостановил выбранную модель. Выбери Gemini в настройках или попробуй позже.', 'MODEL_SUSPENDED');
       if (code === 'model_not_supported' || code === 'model_not_found') throw new RequestError(502, 'Выбранная модель недоступна для этого подключения. Администратору нужно выбрать модель из списка сервиса ИИ.');
       if (response.status === 401 || response.status === 403) throw new RequestError(502, 'Сервис ИИ недоступен: администратору нужно проверить доступ к модели.');
       if (response.status === 429) throw new RequestError(429, 'Сервис ИИ временно ограничил запросы. Попробуй позже.');
