@@ -26,7 +26,7 @@ export function createStore({now = Date.now, ttl = 24 * 60 * 60 * 1000, maxSessi
   function add(owner, {number, config, source, tasks, provider}) {
     const variant = {
       id: randomUUID(), number, config: {...config}, source, provider, created: new Date(now()).toISOString(),
-      tasks: tasks.map(task => ({...task, id: randomUUID(), chat: [], solved: false, attempts: []}))
+      tasks: tasks.map(task => ({...task, id: randomUUID(), chat: [], solved: false, solutionViewed: false, practiceVariantId: null, attempts: []}))
     };
     owner.variants.unshift(variant);
     owner.variants.length = Math.min(owner.variants.length, 20);
@@ -56,7 +56,7 @@ export function createStore({now = Date.now, ttl = 24 * 60 * 60 * 1000, maxSessi
 export function publicVariant(variant) {
   return {
     id: variant.id, number: variant.number, config: {...variant.config}, source: variant.source, provider: variant.provider, created: variant.created,
-    tasks: variant.tasks.map(task => ({id: task.id, tag: task.tag, question: task.question, chat: task.chat.map(item => ({...item}))})),
+    tasks: variant.tasks.map(task => ({id: task.id, tag: task.tag, question: task.question, solutionViewed: task.solutionViewed, practiceVariantId: task.practiceVariantId, chat: task.chat.map(item => ({...item}))})),
     solved: variant.tasks.map(task => task.solved)
   };
 }

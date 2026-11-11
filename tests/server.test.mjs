@@ -113,7 +113,7 @@ test('model request uses server credentials and public generation withholds the 
   const response=await app.post();assert.equal(response.status,200);
   const data=await response.json();assertPublicVariant(data,result);
   const solution=await app.task(data.variant.tasks[0].id,'solution');
-  assert.deepEqual(await solution.json(),{answer:result.tasks[0].answer,explanation:result.tasks[0].explanation});
+  assert.partialDeepStrictEqual(await solution.json(),{answer:result.tasks[0].answer,explanation:result.tasks[0].explanation});
   assert.equal(received.url,'https://example.invalid/v1/chat/completions');
   assert.equal(received.init.headers.Authorization,'Bearer '+settings.LLM_API_KEY);
   const body=JSON.parse(received.init.body);assert.equal(body.model,'test-model');assert.match(body.messages[1].content,/Комплексные числа/);

@@ -69,6 +69,7 @@ class SimulatedAPI:
         self.hold_check = False
         self.next_check_error = False
         self.next_non_json_error = False
+        self.next_practice_error = False
 
     def variant(self, config, source='ai'):
         value = {
@@ -78,7 +79,7 @@ class SimulatedAPI:
             'tasks': [
                 {'id': str(uuid4()), 'tag': 'Дробь',
                  'question': 'Вычисли 1 / 2. <img src=x onerror=alert(1)>',
-                 'chat': []}
+                 'chat': [], 'solutionViewed': False, 'practiceVariantId': None}
                 for _ in range(config['count'])
             ],
             'provider': 'gemini', 'solved': [False] * config['count'],
@@ -150,19 +151,28 @@ class SimulatedAPI:
             if not answer:
                 return route.fulfill(status=400, json={'error': 'Введи ответ перед проверкой.'})
             verdict = 'correct' if answer in {'0,5', '0.5', '1/2'} else 'incorrect'
-            variant['solved'][index] = variant['solved'][index] or verdict == 'correct'
-            return reply(self.checked(verdict))
+            variant['solved'][index] = variant['solved'][index] or verdict == 'correct' and not task['solutionViewed']
+            return reply({**self.checked(verdict),'solved':variant['solved'][index],'solutionViewed':task['solutionViewed'],'progressNote':'После просмотра решения прогресс не начисляется.' if task['solutionViewed'] and not variant['solved'][index] else ''})
         if action == 'hint':
             return reply({'message': 'Начни с преобразования дроби в десятичную запись.'})
         if action == 'solution':
-            return reply({'answer': '0,5', 'explanation': 'Одна из двух равных частей — половина.'})
+            task['solutionViewed'] = True
+            return reply({'answer': '0,5', 'explanation': 'Одна из двух равных частей — половина.', 'solutionViewed': True, 'solved':variant['solved'][index], 'practiceVariantId':task['practiceVariantId']})
         if action == 'chat':
             text = body.get('message', '')
             message = 'Сначала определи, на сколько равных частей делят целое. <script>alert(1)</script>'
             task['chat'].extend([{'role': 'user', 'content': text}, {'role': 'assistant', 'content': message}])
             return reply({'message': message})
         if action == 'similar':
-            return reply({'variant': self.variant({**variant['config'], 'count': 1}, variant['source'])})
+            if body.get('practice'):
+                if self.next_practice_error:
+                    self.next_practice_error=False
+                    return route.fulfill(status=503,json={'error':'Модель временно недоступна.'})
+                existing=next((v for v in self.variants if v['id']==task['practiceVariantId']),None)
+                if existing: return reply({'variant':existing})
+            next_variant=self.variant({**variant['config'], 'count': 1}, variant['source'])
+            if body.get('practice'): task['practiceVariantId']=next_variant['id']
+            return reply({'variant':next_variant})
         raise AssertionError(action)
 
 
@@ -480,4 +490,95 @@ with sync_playwright() as playwright:
         guarded.close()
     assert not errors, errors
     print('PASS browser: blocked/readonly storage, safe Python code text and Shift+Enter')
+    # Real keyless Node server: reproduce the supervisor's reports end to end.
+    review_context=browser.new_context(viewport={'width':390,'height':844})
+    review=review_context.new_page()
+    review.on('pageerror',lambda error:errors.append(str(error)))
+    review.goto(BASE)
+    choose_settings(review,'complex','easy',3)
+    review.locator('[data-select-task]').filter(has_text='Сложение').click()
+    original=review_context.request.get(BASE+'/api/history').json()['variants'][0]
+    addition=next(t for t in original['tasks'] if t['tag']=='Сложение')
+    expression=addition['question'].split('Вычисли ',1)[1].split('. Запиши',1)[0]
+    send_answer(review,expression)
+    expect(review.locator('.verdict-label').last).to_have_text('Уточни ответ')
+    expect(review.locator('#progress-label')).to_contain_text('0 из 3')
+    assert 'Проверено вычислением' not in review.locator('.reply').last.inner_text()
+    review.locator('[data-chat-action="hint"]').click()
+    expect(review.locator('#chat-send')).to_be_enabled()
+    parts=re.findall(r'\((\d+) ([+−]) (\d*)i\)',expression)
+    assert len(parts)==2,expression
+    real=sum(int(a) for a,sign,b in parts)
+    imaginary=sum((1 if sign=='+' else -1)*int(b or '1') for a,sign,b in parts)
+    send_answer(review,f'{real}+({imaginary})i')
+    expect(review.locator('.verdict-label').last).to_have_text('Верно')
+    expect(review.locator('#progress-label')).to_contain_text('1 из 3')
+    review.locator('[data-chat-action="solution"]').click()
+    expect(review.locator('.solution-content')).to_be_visible()
+    expect(review.locator('#practice-button')).to_have_text('Открыть похожее задание')
+    expect(review.locator('#practice-button')).to_be_enabled()
+    expect(review.locator('#progress-label')).to_contain_text('1 из 3')
+    assert review.locator('[data-select-task].active').get_attribute('data-select-task')==addition['id']
+    review.locator('[data-select-task]').filter(has_text='Степени i').click()
+    send_answer(review,'Напиши подробное решение')
+    expect(review.locator('.solution-content')).to_be_visible()
+    expect(review.locator('#practice-button')).to_have_text('Открыть похожее задание')
+    expect(review.locator('#practice-button')).to_be_enabled()
+    revealed=review.locator('.solution-answer').inner_text()
+    # Use the plain explicitly requested answer to avoid KaTeX's accessibility copy.
+    task_id=review.locator('[data-select-task].active').get_attribute('data-select-task')
+    answer=review_context.request.post(BASE+f'/api/tasks/{task_id}/solution',data={}).json()['answer']
+    send_answer(review,answer)
+    expect(review.locator('.verdict-label').last).to_have_text('Верно')
+    expect(review.locator('.reply').last).to_contain_text('не начисляется')
+    expect(review.locator('#progress-label')).to_contain_text('1 из 3')
+    expect(review.locator('#practice-title')).to_have_text('Разобрано с решением')
+    before_reload=len(review_context.request.get(BASE+'/api/history').json()['variants'])
+    review.reload()
+    expect(review.locator('#practice-title')).to_have_text('Разобрано с решением')
+    expect(review.locator('#progress-label')).to_contain_text('1 из 3')
+    expect(review.locator('.solution-content')).not_to_be_visible()
+    assert len(review_context.request.get(BASE+'/api/history').json()['variants'])==before_reload
+    screenshot_clean(review,ARTIFACTS/'review-progress-mobile.png')
+    review.set_viewport_size({'width':1440,'height':1000})
+    screenshot_clean(review,ARTIFACTS/'review-progress-desktop.png')
+    for width in (320,390,768,1440):
+        review.set_viewport_size({'width':width,'height':900})
+        assert not review.evaluate('() => document.documentElement.scrollWidth > innerWidth')
+    review.locator('#practice-button').click()
+    expect(review.locator('[data-select-task]')).to_have_count(1)
+    expect(review.locator('#progress-label')).to_contain_text('0 из 1')
+    # Independently compute the answer to the new i-power task without revealing it.
+    practice=review_context.request.get(BASE+'/api/history').json()['variants'][0]
+    # The history is creation-ordered; opening an older practice does not reorder it.
+    assert practice['tasks'][0]['solutionViewed'] is False
+    assert practice['config']['topic']=='complex'
+    power=int(re.search(r'i\^\((\d+)\)',practice['tasks'][0]['question']).group(1))
+    final=['1','i','-1','-i'][power%4]
+    send_answer(review,final)
+    expect(review.locator('#progress-label')).to_contain_text('1 из 1')
+    review_context.close()
+    assert not errors,errors
+    print('PASS browser: real copied-expression guard, hints, earned credit, reviewed solution, automatic practice, reload and fresh independent progress')
+
+    failure_context=browser.new_context(viewport={'width':390,'height':844})
+    failure_fixture=SimulatedAPI()
+    failure_fixture.variant({'topic':'complex','level':'easy','count':1})
+    failure_fixture.next_practice_error=True
+    failure_context.route('**/api/**',failure_fixture.route)
+    failure_page=failure_context.new_page();failure_page.goto(BASE)
+    failure_page.fill('#chat-input','сохранить черновик')
+    failure_page.locator('[data-chat-action="solution"]').click()
+    expect(failure_page.locator('.solution-content')).to_be_visible()
+    expect(failure_page.locator('#practice-status')).to_contain_text('Модель временно недоступна')
+    expect(failure_page.locator('#chat-input')).to_have_value('сохранить черновик')
+    expect(failure_page.locator('#practice-button')).to_have_text('Повторить создание')
+    failure_page.locator('#practice-button').click()
+    expect(failure_page.locator('#practice-button')).to_have_text('Открыть похожее задание')
+    expect(failure_page.locator('#practice-button')).to_be_enabled()
+    assert len(failure_fixture.variants)==2
+    assert failure_page.locator('.solution-content').is_visible()
+    assert len([1 for path,body in failure_fixture.calls if path.endswith('/solution')])==1
+    failure_context.close()
+    print('PASS browser: failed automatic AI practice keeps solution and draft; explicit retry succeeds without repeated disclosure')
     browser.close()

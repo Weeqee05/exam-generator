@@ -29,7 +29,7 @@ function publicVariant(value) {
     if (!task || !safeId(task.id) || typeof task.question !== 'string' || !task.question.trim() || typeof task.tag !== 'string') throw new Error('В задании не хватает условия. Создай новый вариант.');
     const chat = Array.isArray(task.chat) ? task.chat.filter(item => ['user', 'assistant'].includes(item?.role) && typeof item.content === 'string')
       .slice(-24).map(item => ({role: item.role, content: item.content.slice(0, 12000)})) : [];
-    return {id: task.id, tag: task.tag, question: task.question, chat};
+    return {id: task.id, tag: task.tag, question: task.question, chat, solutionViewed:task.solutionViewed===true, practiceVariantId:safeId(task.practiceVariantId)?task.practiceVariantId:null};
   });
   return {id: value.id, number: value.number, config: {...value.config}, source: value.source,
     created: value.created, provider: value.provider, tasks, solved: tasks.map((_, index) => value.solved?.[index] === true)};
@@ -42,6 +42,8 @@ export function mountApp(doc, storage, env = {}) {
   let providers = [], activeProvider = saved.preferredProvider || 'gemini';
   let toastTimer, storageWarned = false;
   const conversations = new Map(), solutions = new Map(), selections = new Map();
+  const practiceErrors = new Map();
+  let practicePending = null;
   $('topic').innerHTML = Object.entries(TOPICS).map(([id, topic]) => `<option value="${id}">${escapeHtml(topic.name)}</option>`).join('');
   const icon = name => `<svg aria-hidden="true"><use href="#i-${name}"/></svg>`;
   const selectedTask = () => current?.tasks.find(task => task.id === selectedTaskId);
@@ -147,10 +149,48 @@ export function mountApp(doc, storage, env = {}) {
     $('history-count').textContent = history.length;
     if (!current) return;
     const solved = current.solved.filter(Boolean).length;
-    $('progress-label').textContent = `Проверено верно ${solved} из ${current.tasks.length}`;
+    $('progress-label').textContent = `Решено самостоятельно ${solved} из ${current.tasks.length}`;
     $('progress-fill').style.width = `${100 * solved / current.tasks.length}%`;
     $('completion-note').hidden = solved !== current.tasks.length;
-    $('task-list').innerHTML = current.tasks.map((task, index) => `<button type="button" class="task-nav-item${task.id === selectedTaskId ? ' active' : ''}" data-select-task="${escapeHtml(task.id)}" data-request aria-current="${task.id === selectedTaskId ? 'step' : 'false'}"><span class="task-number">${String(index+1).padStart(2,'0')}</span><span class="task-name">${escapeHtml(task.tag)}</span>${current.solved[index] ? '<span class="task-solved" aria-label="Проверено верно">✓</span>' : ''}</button>`).join('');
+    $('task-list').innerHTML = current.tasks.map((task, index) => `<button type="button" class="task-nav-item${task.id === selectedTaskId ? ' active' : ''}" data-select-task="${escapeHtml(task.id)}" data-request aria-current="${task.id === selectedTaskId ? 'step' : 'false'}"><span class="task-number">${String(index+1).padStart(2,'0')}</span><span class="task-name">${escapeHtml(task.tag)}</span>${current.solved[index] ? '<span class="task-solved" aria-label="Решено самостоятельно">✓</span>' : task.solutionViewed ? '<span class="task-reviewed" aria-label="Разобрано с решением">◌</span>' : ''}</button>`).join('');
+    renderPractice();
+  }
+  function applyTaskState(task,result) {
+    // Only the server decides whether a correct response earns progress.
+    const index=current.tasks.findIndex(item=>item.id===task.id);
+    if(typeof result.solved==='boolean') current.solved[index]=result.solved;
+    if(typeof result.solutionViewed==='boolean') task.solutionViewed=result.solutionViewed;
+    if(safeId(result.practiceVariantId)) task.practiceVariantId=result.practiceVariantId;
+  }
+  function renderPractice() {
+    const task=selectedTask(),area=$('solution-practice');
+    area.hidden=!task?.solutionViewed;
+    if(area.hidden) return;
+    const solved=current.solved[current.tasks.findIndex(item=>item.id===task.id)];
+    $('practice-title').textContent=solved?'Решено самостоятельно · решение просмотрено':'Разобрано с решением';
+    $('practice-description').textContent=solved?'Заработанный зачёт сохранён. Можно потренироваться на новом задании.':'Ответы на это задание можно обсуждать, но в самостоятельный прогресс они не попадут. Реши новое похожее задание — подсказками пользоваться можно.';
+    $('practice-status').textContent=practicePending===task.id?'Создаём похожее задание…':practiceErrors.get(task.id)||'';
+    $('practice-button').textContent=task.practiceVariantId?'Открыть похожее задание':practiceErrors.has(task.id)?'Повторить создание':'Создать похожее задание';
+    $('practice-button').disabled=busy;
+  }
+  async function createPractice(task) {
+    if(task.practiceVariantId) return;
+    practicePending=task.id;practiceErrors.delete(task.id);renderPractice();
+    setBusy(true,'Решение открыто. Создаём похожее задание для самостоятельной попытки…');
+    try {
+      const result=await api('/api/tasks/'+encodeURIComponent(task.id)+'/similar',{practice:true});
+      const next=publicVariant(result.variant);
+      history=[current,next,...history.filter(v=>v.id!==current.id && v.id!==next.id)].slice(0,20);
+      task.practiceVariantId=next.id;persist();
+    } catch(error) {
+      practiceErrors.set(task.id,'Решение сохранено. Похожее задание пока не создано: '+errorText(error));
+    } finally {practicePending=null;updateProgress();}
+  }
+  async function practiceAction() {
+    const task=selectedTask();if(busy || !task?.solutionViewed) return;
+    if(task.practiceVariantId) return loadVariant(task.practiceVariantId);
+    saveDraft();
+    try {await createPractice(task);} finally {setBusy(false);renderPractice();}
   }
   function renderQuestion(task) {
     const area = $('task-question'); area.replaceChildren();
@@ -200,7 +240,7 @@ export function mountApp(doc, storage, env = {}) {
     render();persist();
     $('app-error').hidden=true;
     const validTasks=new Set(history.flatMap(v=>v.tasks.map(t=>t.id)));
-    for(const map of [conversations,solutions]) for(const id of map.keys())if(!validTasks.has(id))map.delete(id);
+    for(const map of [conversations,solutions,practiceErrors]) for(const id of map.keys())if(!validTasks.has(id))map.delete(id);
     for(const id of selections.keys())if(!history.some(v=>v.id===id))selections.delete(id);
   }
   async function generate() {
@@ -264,11 +304,12 @@ export function mountApp(doc, storage, env = {}) {
       if(result.kind==='feedback') {
         if(!Object.hasOwn(labels,result.verdict))throw new Error('Не удалось понять оценку ответа. Попробуй ещё раз.');
         reply={role:'assistant',kind:'feedback',feedback:result};
-        current.solved[current.tasks.findIndex(t=>t.id===task.id)] ||= result.verdict==='correct';
+        applyTaskState(task,result);
         $('announcer').textContent=labels[result.verdict];
       } else if(result.kind==='solution') {
         if(typeof result.answer!=='string'||typeof result.explanation!=='string')throw new Error('Не удалось загрузить решение.');
         solutions.set(task.id,result);reply={role:'assistant',kind:'solution',solution:result};
+        applyTaskState(task,result);
       } else {
         if(typeof result.message!=='string')throw new Error('Ассистент не прислал объяснение.');
         reply={role:'assistant',kind:'text',content:result.message};
@@ -277,11 +318,13 @@ export function mountApp(doc, storage, env = {}) {
       delete saved.drafts[task.id];persist();$('chat-input').value='';
       renderMessages();updateProgress();
       $('chat-messages').lastElementChild?.scrollIntoView({behavior:scrollBehavior(),block:'nearest'});
+      if(result.kind==='solution') await createPractice(task);
     } catch(error){$('chat-error').textContent=errorText(error);$('chat-error').hidden=false;}
     finally{setBusy(false);$('chat-input').focus({preventScroll:true});}
   }
   async function chatAction(action) {
     if(busy || !selectedTask())return;
+    if(action==='similar' && selectedTask().solutionViewed) return practiceAction();
     saveDraft();$('chat-error').hidden=true;
     const task=selectedTask();
     if(action==='solution' && solutions.has(task.id)){
@@ -297,12 +340,15 @@ export function mountApp(doc, storage, env = {}) {
       if(action==='solution'){
         if(typeof result.answer!=='string'||typeof result.explanation!=='string')throw new Error('Не удалось загрузить решение. Попробуй ещё раз.');
         solutions.set(task.id,result);reply={role:'assistant',kind:'solution',solution:result};
+        applyTaskState(task,result);
       } else {
         if(typeof result.message!=='string')throw new Error('Ассистент не прислал объяснение. Попробуй ещё раз.');
         reply={role:'assistant',kind:'text',content:result.message};
       }
       conversationFor(task).push({role:'user',content:caption,kind:'text'},reply);renderMessages();
+      updateProgress();
       $('chat-messages').lastElementChild?.scrollIntoView({behavior:scrollBehavior(),block:'nearest'});
+      if(action==='solution') await createPractice(task);
     } catch(error){$('chat-error').textContent=errorText(error);$('chat-error').hidden=false;}
     finally{setBusy(false);}
   }
@@ -329,6 +375,7 @@ export function mountApp(doc, storage, env = {}) {
   $('chat-input').addEventListener('input',saveDraft);
   $('chat-input').addEventListener('keydown',event=>{if(event.key==='Enter'&&!event.shiftKey&&!event.isComposing){event.preventDefault();return submitMessage();}});
   $('chat-quick-actions').addEventListener('click',event=>{const button=event.target.closest('[data-chat-action]');if(button)return chatAction(button.dataset.chatAction);});
+  $('practice-button').addEventListener('click',practiceAction);
   for(const id of ['nav-history','rail-history'])$(id).addEventListener('click',showHistory);
   $('history-search').addEventListener('input',renderHistory);
   $('history-list').addEventListener('click',event=>{const button=event.target.closest('[data-load]');if(button)return loadVariant(button.dataset.load);});

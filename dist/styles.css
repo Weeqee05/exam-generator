@@ -783,6 +783,23 @@ h1 {
   color: var(--lime);
 }
 
+.task-nav-item .task-reviewed {
+  margin-left: auto;
+  color: var(--muted);
+}
+
+.solution-practice {
+  margin: 16px 0;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #caff7a06;
+  overflow-wrap: anywhere;
+}
+.solution-practice h3 { margin: 0 0 8px; font-size: 15px; color: var(--lime); }
+.solution-practice p { margin: 8px 0; font-size: 13px; line-height: 1.6; color: var(--muted); }
+.solution-practice .text-button { min-height: 44px; color: var(--lime); }
+
 .text-button {
   padding: 4px 0;
   color: var(--muted);

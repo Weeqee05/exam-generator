@@ -10,6 +10,7 @@ import {RequestError, readLimited} from './server/errors.mjs';
 import {createModelRegistry, loadProviderSettings, configureRuntimeProxy} from './server/provider.mjs';
 import {createStore, publicVariant} from './server/store.mjs';
 import {checkDeterministic} from './server/checker.mjs';
+import {incompleteAttempt} from './server/answer-policy.mjs';
 import {validateProbabilityReference} from './server/probability.mjs';
 import {safeHint, safeTutorMessage, safeFeedback} from './server/disclosure.mjs';
 import {generationMessages} from './prompts/generation.mjs';
@@ -157,12 +158,16 @@ export function createApp({settings = process.env, fetchModel = globalThis.fetch
     if (typeof answer !== 'string' || !answer.trim()) throw new RequestError(400, 'Сначала введи свой ответ или решение.');
     if (answer.length > 4000) throw new RequestError(400, 'Сократи ответ до 4000 символов.');
     const studentAnswer = answer.trim();
-    let feedback = checkDeterministic(task, studentAnswer);
+    let feedback = incompleteAttempt(task, studentAnswer) || checkDeterministic(task, studentAnswer);
     if (!feedback) feedback = model.ready
       ? validateFeedback(await ask(req, model, checkingMessages(task, studentAnswer)))
       : {verdict:'clarify', explanation:'Какой итоговый ответ у тебя получился? Без ИИ я надёжно проверяю только поддерживаемые краткие ответы.', error:'', hint:'', method:'limited', needsClarification:true};
     feedback = safeFeedback(task, feedback, studentAnswer);
-    task.solved ||= feedback.verdict === 'correct';
+    task.solved ||= feedback.verdict === 'correct' && !task.solutionViewed;
+    feedback.solved = task.solved;
+    feedback.solutionViewed = task.solutionViewed;
+    feedback.progressNote = task.solutionViewed && !task.solved
+      ? 'Решение уже просмотрено: проверка доступна для разбора, но самостоятельный прогресс за это задание не начисляется. Реши похожее задание.' : '';
     task.attempts.push({answer:studentAnswer, verdict:feedback.verdict});
     if (task.attempts.length > 10) task.attempts.shift();
     const title = {correct:'Верно',incorrect:'Неверно',partial:'Частично верно',clarify:'Уточни ответ'}[feedback.verdict];
@@ -225,7 +230,12 @@ export function createApp({settings = process.env, fetchModel = globalThis.fetch
           action = directAction(input.message) || 'respond';
           if (action === 'simpler') { action = 'chat'; input.action = 'simpler'; }
         }
-        if (action === 'solution') return reply({answer: task.answer, explanation: task.explanation}, 'solution');
+        if (action === 'solution') {
+          // Mark immediately, including while a grading request is in flight.
+          // A previously earned independent result remains earned.
+          task.solutionViewed = true;
+          return reply({answer: task.answer, explanation: task.explanation, solved: task.solved, solutionViewed: true, practiceVariantId: task.practiceVariantId}, 'solution');
+        }
         if (action === 'hint') {
           const message = safeHint(task);
           store.remember(task, 'Дай подсказку', message);
@@ -237,8 +247,9 @@ export function createApp({settings = process.env, fetchModel = globalThis.fetch
           if (action === 'check') return reply(await grade(req, model, task, input.answer), 'feedback');
           if (action === 'respond') {
             const text = input.message.trim();
+            const copied = incompleteAttempt(task, text);
             const numeric = checkDeterministic(task, text);
-            if (numeric && numeric.verdict !== 'clarify') return reply(await grade(req, model, task, text), 'feedback');
+            if (copied || numeric && numeric.verdict !== 'clarify') return reply(await grade(req, model, task, text), 'feedback');
             if (!model.ready) {
               if (numeric) return reply(await grade(req, model, task, text), 'feedback');
               const message = `Для свободного диалога нужна подключённая модель. Сейчас могу дать подсказку или показать решение. ${safeHint(task)}`;
@@ -266,10 +277,17 @@ export function createApp({settings = process.env, fetchModel = globalThis.fetch
             return reply({message: response});
           }
           if (action === 'similar') {
+            if(input.practice !== undefined && typeof input.practice !== 'boolean') throw new RequestError(400,'Некорректный запрос похожего задания.');
+            if(input.practice) {
+              if(!task.solutionViewed) throw new RequestError(400,'Сначала открой решение этого задания.');
+              const existing=owner.variants.find(item=>item.id===task.practiceVariantId);
+              if(existing) return reply({variant:publicVariant(existing)},'variant');
+            }
             const config = {...variant.config, count: 1};
             const largest = Math.max(...owner.variants.map(item => item.number));
             const number = largest < Number.MAX_SAFE_INTEGER ? largest + 1 : 1;
             const next = await generate(req, owner, config, number, variant.source, provider, task.question, task.tag);
+            if(input.practice) task.practiceVariantId=next.id;
             return reply({variant: next}, 'variant');
           }
         } finally { task.busy = false; }

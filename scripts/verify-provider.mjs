@@ -75,6 +75,8 @@ if (!registry.get(provider)?.ready) {
     assert.equal(feedback.kind, 'feedback', 'Развёрнутая попытка должна распознаваться как ответ.');
     assert.equal(feedback.method, 'ai', 'Ожидалась настоящая проверка развёрнутого решения моделью.');
     assert.equal(feedback.verdict, 'correct', 'Модель не подтвердила собственное эталонное решение.');
+    assert.equal(feedback.solved, false, 'После просмотра решения самостоятельный прогресс не начисляется.');
+    assert.equal(feedback.solutionViewed, true);
     console.log('PASS: реальная ИИ-проверка развёрнутого ответа:', feedback.explanation);
     const chat = await api(`/api/tasks/${task.id}/respond`, {message: 'Как выбрать метод для этого задания? Объясни первый шаг, без итогового ответа.'});
     assert.equal(chat.kind, 'message', 'Вопрос должен получить объяснение, а не оценку.');

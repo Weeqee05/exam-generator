@@ -25,5 +25,6 @@ export function feedbackParagraphs(feedback) {
     const text = typeof feedback[key] === 'string' ? feedback[key].trim() : '';
     if (text && !paragraphs.some(value => normalize(value).includes(normalize(text)))) paragraphs.push(text);
   }
+  if(typeof feedback.progressNote==='string' && feedback.progressNote.trim()) paragraphs.push(feedback.progressNote.trim());
   return paragraphs;
 }

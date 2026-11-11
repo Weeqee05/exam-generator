@@ -236,7 +236,7 @@ test('AI generation withholds reference data until an explicit solution request'
   const hint=await app.action(variant.tasks[0].id,'hint');assert.equal(hint.status,200);
   assert.ok((await hint.json()).message);
   const solution=await(await app.action(variant.tasks[0].id,'solution')).json();
-  assert.deepEqual(solution,{answer:reference.answer,explanation:reference.explanation});
+  assert.partialDeepStrictEqual(solution,{answer:reference.answer,explanation:reference.explanation});
 });
 
 test('hints, feedback and chat suppress an obvious leaked reference until solution is requested',async t=>{
@@ -267,7 +267,7 @@ test('hints, feedback and chat suppress an obvious leaked reference until soluti
   const restored=(await(await app.get('/api/variants/'+variant.id)).json()).variant;
   privateReferenceAbsent(restored.tasks[0].chat);
   const solution=await app.action(id,'solution');assert.equal(solution.status,200);
-  assert.deepEqual(await solution.json(),{answer:task.answer,explanation:task.explanation});
+  assert.partialDeepStrictEqual(await solution.json(),{answer:task.answer,explanation:task.explanation});
 });
 
 test('a useful mathematical hint is preserved when a formula contains the same digit as the answer',async t=>{
@@ -600,4 +600,74 @@ test('repeated inconsistent probability output does not replace existing history
   await app.generate('local');
   const response=await app.generate('ai',parameters,2);assert.equal(response.status,502);assert.equal(calls,2);assert.equal((await response.json()).code,'MODEL_VARIANT_INVALID');
   const history=await(await app.get('/api/history')).json();assert.equal(history.variants.length,1);assert.equal(history.variants[0].source,'local');
+});
+
+test('copying a computational condition is clarified before deterministic or AI grading',async t=>{
+ const exercise={...reference,question:'Вычисли сумму (3 + 2i) + (1 + 5i).',answer:'4+7i'};
+ let calls=0;
+ const app=(await harness(t,{settings,fetchModel:async()=>{calls++;return modelResponse(generated([exercise]));}})).client();
+ const {variant}=await(await app.generate('ai')).json();const id=variant.tasks[0].id;
+ for(const [action,data] of [['check',{answer:'(3+2i)+(1+5i)'}],['respond',{message:exercise.question}]]) {
+  const result=await(await app.action(id,action,data)).json();assert.equal(result.verdict,'clarify');assert.equal(result.solved,false);assert.notEqual(result.method,'code');
+ }
+ assert.equal(calls,1,'copied attempts must not be sent to the model');
+ assert.deepEqual((await(await app.get('/api/variants/'+variant.id)).json()).variant.solved,[false]);
+ const result=await(await app.action(id,'respond',{message:'4+7i'})).json();assert.equal(result.solved,true);
+});
+
+test('solution disclosure blocks subsequent code and AI progress, including restored history and forged flags',async t=>{
+ const app=(await harness(t,{settings,fetchModel:async(_url,options)=>{
+  const body=JSON.parse(options.body);
+  return modelResponse(body.messages[0].content.includes('Составляй')?generated():{verdict:'correct',explanation:'Ход решения правильный.',error:'',hint:''});
+ }})).client();
+ const {variant}=await(await app.generate('ai')).json();const id=variant.tasks[0].id;
+ const solution=await(await app.action(id,'respond',{message:'Покажи решение'})).json();assert.equal(solution.solutionViewed,true);assert.equal(solution.solved,false);
+ for(const [action,data] of [['respond',{message:'0,5',solutionViewed:false,solved:true}],['check',{answer:'Мой ход решения: разделил единицу на два и получил половину.'}]]) {
+  const result=await(await app.action(id,action,data)).json();assert.equal(result.verdict,'correct');assert.equal(result.solved,false);assert.equal(result.solutionViewed,true);assert.match(result.progressNote,/не начисляется/);
+ }
+ for(const path of ['/api/history','/api/variants/'+variant.id]) {
+  const body=await(await app.get(path)).json();const stored=body.variant||body.variants[0];publicOnly(stored);assert.deepEqual(stored.solved,[false]);assert.equal(stored.tasks[0].solutionViewed,true);
+ }
+});
+
+test('hints preserve credit and viewing a solution after success does not remove earned progress',async t=>{
+ const app=(await harness(t,{settings,fetchModel:async()=>modelResponse(generated())})).client();
+ const {variant}=await(await app.generate('ai')).json();const id=variant.tasks[0].id;
+ await app.action(id,'hint');await app.action(id,'chat',{action:'hint'});
+ const result=await(await app.action(id,'respond',{message:'2/4'})).json();assert.equal(result.solved,true);assert.equal(result.solutionViewed,false);
+ const solution=await(await app.action(id,'solution')).json();assert.equal(solution.solved,true);assert.equal(solution.solutionViewed,true);
+ assert.deepEqual((await(await app.get('/api/history')).json()).variants[0].solved,[true]);
+});
+
+test('practice after disclosure retries on failure and reuses the resulting private-safe task',async t=>{
+ let calls=0;const parameters={topic:'custom',customTopic:'Сложение дробей',level:'easy',count:1};
+ const app=(await harness(t,{settings,fetchModel:async()=>{
+  calls++;
+  if(calls===2)return new Response('unavailable',{status:503});
+  return modelResponse(generated([{...reference,question:calls===1?'Вычисли 1 / 2.':'Вычисли 2 / 4.'}],parameters));
+ }})).client();
+ const {variant}=await(await app.generate('ai',parameters)).json();const id=variant.tasks[0].id;
+ assert.equal((await app.action(id,'similar',{practice:true})).status,400);
+ const solution=await(await app.action(id,'solution')).json();assert.equal(solution.answer,'1/2');
+ assert.equal((await app.action(id,'similar',{practice:true})).status,503);
+ assert.equal((await(await app.get('/api/history')).json()).variants.length,1);
+ const {variant:next}=await(await app.action(id,'similar',{practice:true})).json();publicOnly(next);assert.deepEqual(next.config,parameters);assert.deepEqual(next.solved,[false]);assert.equal(next.tasks[0].solutionViewed,false);
+ const again=await(await app.action(id,'similar',{practice:true})).json();assert.equal(again.variant.id,next.id);assert.equal(calls,3);
+ const original=(await(await app.get('/api/variants/'+variant.id)).json()).variant;assert.equal(original.tasks[0].practiceVariantId,next.id);assert.deepEqual(original.solved,[false]);
+ const newAnswer=await(await app.action(next.tasks[0].id,'respond',{message:'0,5'})).json();assert.equal(newAnswer.solved,true);
+ const revealedAgain=await(await app.action(id,'solution')).json();assert.equal(revealedAgain.practiceVariantId,next.id);assert.equal(revealedAgain.answer,'1/2');
+});
+
+test('a solution opened while AI grading is in flight prevents independent credit',async t=>{
+ let release,started;const waiting=new Promise(resolve=>{started=resolve;});
+ const app=(await harness(t,{settings,fetchModel:async(_url,options)=>{
+  const body=JSON.parse(options.body);
+  if(body.messages[0].content.includes('Составляй'))return modelResponse(generated());
+  started();return new Promise(resolve=>{release=()=>resolve(modelResponse({verdict:'correct',explanation:'Верно.',error:'',hint:''}));});
+ }})).client();
+ const {variant}=await(await app.generate('ai')).json();const id=variant.tasks[0].id;
+ const grading=app.action(id,'check',{answer:'Разделил числитель на знаменатель, получил половину.'});await waiting;
+ await app.action(id,'solution');release();
+ const result=await(await grading).json();assert.equal(result.verdict,'correct');assert.equal(result.solved,false);
+ assert.deepEqual((await(await app.get('/api/history')).json()).variants[0].solved,[false]);
 });
